@@ -1,16 +1,24 @@
-# This is a sample Python script.
-
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
-
+import threading
+import subprocess
 
 # Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+def run_script(script_name):
+    subprocess.run(["python", script_name])
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+if __name__ == '__main__':
+
+    print("Simulation START: ")
+
+
+    if __name__ == "__main__":
+        script1_thread = threading.Thread(target=run_script, args=("./transmitter.py",))
+        script2_thread = threading.Thread(target=run_script, args=("./receiver.py",))
+
+        script1_thread.start()
+        script2_thread.start()
+
+        script1_thread.join()
+        script2_thread.join()
+
+        print("Both scripts have finished executing.")
+
