@@ -1,6 +1,4 @@
 # transmitter
-#TODO:
-
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib. animation import FuncAnimation
@@ -8,7 +6,11 @@ import channel
 import timeframe
 import time
 from scipy.signal import chirp, spectrogram
+import threading
+import subprocess
 
+def run_plot(script_name):
+    subprocess.run(["python", script_name])
 
 
 def plot_function(x, y, title='Grafico', x_label='X', y_label='Y', time_slice = True):
