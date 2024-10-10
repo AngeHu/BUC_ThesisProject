@@ -1,5 +1,5 @@
 import os
-import timeframe
+import timeframe as tf
 import numpy as np
 
 fifo_path  = "/tmp/channel"
@@ -45,7 +45,7 @@ class Channel:
 
     def send_signal(self, signal):
         noisy_signal = self.add_noise(signal)
-        for i in range(timeLapse.f_sampling * 4):
+        for i in range(tf.f_sampling * 4):
             formatted_data = f'{noisy_signal[i]:.5g}'
             data = str(formatted_data)+'\n'
             self.send_data(data)
@@ -56,7 +56,7 @@ class Channel:
 
     def read_signal(self):
         signal = []
-        for i in range(timeLapse.f_sampling * 4):
+        for i in range(tf.f_sampling * 4):
             data = self.read_data()
             if data is not None:
                 signal.append(data)
