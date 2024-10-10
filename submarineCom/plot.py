@@ -78,6 +78,7 @@ class Animation:
             self.sig.set_ydata(self.y_sig)
         #self.done = True
 
+
     def animate(self, shared_data):
         self.anim = FuncAnimation(self.fig, self.update, frames=None, fargs=(shared_data,),save_count=100, interval=1)
         plt.show()

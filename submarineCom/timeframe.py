@@ -6,6 +6,7 @@ t_slot = T_frame/4 # periodo segnale
 t_sample = t_slot # tempo di campionamento
 
 
+
 class Period:
     def __init__(self, start, end, data):
         self.start = start

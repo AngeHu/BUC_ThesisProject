@@ -9,6 +9,7 @@ import threading
 import plot
 import queue
 
+
 shared_data = {
     'signal': queue.Queue(),
     'frequency' : queue.Queue(),
