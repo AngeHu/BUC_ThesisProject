@@ -1,5 +1,5 @@
 import os
-import timeframe as tf
+import params as tf
 import numpy as np
 
 fifo_path  = "/tmp/channel"
@@ -32,19 +32,25 @@ class Channel:
         self.open(mode)
 
 
-    def add_noise(self, signal):
-        noise = np.random.normal(0, 0.5, len(signal))
-        print(noise)
+    def add_noise(self, signal, noise_level):
+        noise = np.random.normal(0, 1, len(signal)) * noise_level
+        if tf.DEBUG: print("Average noise:",np.average(noise))
+        if tf.DEBUG: print("Power noise (measured): ", sum(noise**2)/(2*tf.f_sampling)) #se diviso per len(signal) da la metà
+        if tf.DEBUG: print("Check SNR: ", sum(signal**2) / (sum(noise**2)/2))
         signal = signal + noise
         return signal
+        
 
     def send_data(self, data):
-        self.fifo.write(data)
-        self.fifo.flush() # assicura che i dati vengano scritti immediatamente , permette a receiver di leggere
+        try:
+            self.fifo.write(data)
+            self.fifo.flush()  # Ensure data is written immediately
+        except BrokenPipeError:
+            print("BrokenPipeError: The receiver has closed the pipe.")
+            self.fifo.close()
 
-
-    def send_signal(self, signal):
-        noisy_signal = self.add_noise(signal)
+    def send_signal(self, signal, noise_level):
+        noisy_signal = self.add_noise(signal, noise_level)
         for i in range(tf.f_sampling * 4):
             formatted_data = f'{noisy_signal[i]:.5g}'
             data = str(formatted_data)+'\n'

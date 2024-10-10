@@ -8,68 +8,93 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 import channel
-import timeframe
+import params as tf
+from scipy.signal import chirp, stft, correlate
+from scipy.fft import fftshift
 
-t = np.linspace(0, timeframe.T_frame, timeframe.f_sampling*4) # vettore tempo
+# increase agg.path.chunksize
+plt.rcParams['agg.path.chunksize'] = 10000
 
-def plot_function(x, y, title='Grafico', x_label='X', y_label='Y', time_slice = True):
-    plt.figure(figsize=(10, 8))  # Imposta le dimensioni del grafico (opzionale)
-    plt.plot(x, y, label='Dati')  # Crea il grafico
+t = np.linspace(0, tf.t_slot, tf.f_sampling) # vettore tempo
+chirp_signal = chirp(t, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
 
-    plt.title(title)  # Aggiunge un titolo al grafico
-    plt.xlabel(x_label)  # Aggiunge un'etichetta all'asse x
-    plt.ylabel(y_label)  # Aggiunge un'etichetta all'asse y
-    if time_slice:
-        plt.xlim(0, timeframe.T_frame)
-        plt.ylim(0, timeframe.f_max)
-    plt.legend()  # Aggiunge una legenda al grafico (opzionale)
+def plot_function(x, y_sig):
+    if(len(x) != len(y_sig)):
+        print("Errore: dimensioni di x e y non coincidono")
+        return
+    figure, ax = plt.subplots()
+    sig, = ax.plot(x, y_sig, color='r', label='Segnale')  # Crea il grafico
 
+    ax.set_xlabel('Time(s)')  # Aggiunge un'etichetta all'asse x
+    ax.set_ylabel('Frequenza')  # Aggiunge un'etichetta all'asse y1
+    ax.set_xlim(0, 4*tf.T_frame)
+    ax.set_ylim(-5, 5)
     plt.grid(True)  # Aggiunge una griglia al grafico (opzionale)
-
-    # animate = FuncAnimation(fig, animate, frames=20, interval=500, repeat=False)
     plt.show()  # Mostra il grafico
 
+def plot_correlation(signal: np.array):
+    global chirp_signal
+    correlation = correlate(signal, chirp_signal, mode='full')
+    lags = np.arange(-len(signal) + 1, len(chirp_signal))/(4*tf.f_sampling)
+    #lags = np.arange(0, len(signal))
+    plt.figure()
+    plt.plot(lags, correlation)
+    plt.title('Cross-Correlation between Signal and Chirp')
+    plt.xlabel('Lag')
+    plt.grid(True)
+    plt.show()
+
+def plot_spectrogram(signal: np.array):
+    f, t, Sxx = stft(signal, fs=tf.f_sampling, window='hamming', nperseg=128, noverlap=64)
+    Sxx_magnitude = np.abs(Sxx)
+    plt.pcolormesh(t, f, Sxx_magnitude)
+    plt.ylabel('Frequency [Hz]')
+    plt.xlabel('Time [sec]')
+    plt.show()
 
 class Receiver:
     def __init__(self):
         self.channel = channel.Channel('r')
         print("Receiver ON")
         self.channel.open('r')
-        self.dataCount = 0
-        self.data = []
 
     def read(self):
-        '''
-        print("Reading data")
-        self.data[self.dataCount] = self.channel.read_data()
-        print("Finished reading data")
-        print(self.data[self.dataCount])
-        #decipher(data)
-        self.dataCount = self.dataCount + 1
-        '''
         data = self.channel.read_signal()
         return data
 
     def plot_data(self, data):
         print("Data length: ", len(data))
-        x = np.linspace(0, timeframe.T_frame, len(data))
-        plot_function(x, data, "Received", "t", "E", False)
+        x = np.linspace(0, 4*tf.T_frame, len(data))
+        plot_function(x, data)
 
-    # def decipher(self):
-        #i = 0
-        #while i == self.dataCount:
-            #self.deciphered[i] =
-            #pass
+    def decipher(self, signal):
+        correlated_signal = correlate(signal, chirp_signal, mode='full')
+        lags = np.arange(-len(signal) + 1, len(chirp_signal))/(tf.f_sampling)
+        threshold = 0.8 * np.max(correlated_signal)  # Set a threshold at 80% of the maximum correlation value
+        detected_positions = lags[np.where(correlated_signal > threshold)]  # Find lags where the correlation exceeds the threshold
+        # print("Detected Chirp positions (in samples):", detected_positions)
+
 
 if __name__ == "__main__":
+    info = "00100100"
     rc = Receiver()
-    '''
+    i = 0
+    data = np.array([])
     while True:
         data_str = rc.read()
-        data = [float(x) for x in data_str]
-        rc.plot_data(data)
-    '''
-        # see correlation
+        if data_str is not []:
+            float_data = [float(i) for i in data_str]
+            data = np.append(data, float_data)
+            rc.decipher(float_data)
+            i += 1
+            if i % 4==0:
+                print(i)
+                # plot data
+                rc.plot_data(data)
 
+                # correlation
+                plot_correlation(data)
 
-
+                # spectrogram
+                plot_spectrogram(data)
+                data = np.array([])
