@@ -10,7 +10,6 @@ t_sample = t_slot # tempo di campionamento
 
 SNR = 1 # rapporto segnale rumore
 
-
 class Period:
     def __init__(self, start, end, data):
         self.start = start
