@@ -8,6 +8,7 @@ f_sampling = 96000 # frequenza campionamento
 t_slot = T_frame/4 # periodo segnale
 t_sample = t_slot # tempo di campionamento
 
+
 SNR = 1 # rapporto segnale rumore
 
 class Period:

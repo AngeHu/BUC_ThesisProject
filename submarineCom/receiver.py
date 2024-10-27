@@ -74,7 +74,6 @@ class Receiver:
         detected_positions = lags[np.where(correlated_signal > threshold)]  # Find lags where the correlation exceeds the threshold
         # print("Detected Chirp positions (in samples):", detected_positions)
 
-
 if __name__ == "__main__":
     info = "00100100"
     rc = Receiver()

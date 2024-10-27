@@ -91,7 +91,6 @@ if __name__ == "__main__":
         print("Power noise: ", E_signal/tf.SNR)
         # Attenzione al fattore 4!!
         transmitter.send_signal((E_signal)/tf.SNR)
-
         i = i + 1
         if i % 4 == 0:
 

@@ -31,7 +31,6 @@ class Channel:
             print(f"FIFO named {self.channel} already exists")
         self.open(mode)
 
-
     def add_noise(self, signal, noise_level):
         noise = np.random.normal(0, 1, len(signal)) * noise_level
         if tf.DEBUG: print("Average noise:",np.average(noise))
