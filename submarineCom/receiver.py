@@ -36,10 +36,10 @@ def plot_function(x, y_sig):
 class Receiver:
     def __init__(self):
         self.channel = channel.Channel('r')
-        print("Receiver ON")
+        if not tf.BER_SNR_SIMULATION: print("Receiver ON")
         self.channel.open('r')
         self.correlation = []
-        self.deciphered_data = []
+        self.deciphered_data = np.array([])
 
 
     def read(self):
@@ -84,25 +84,23 @@ class Receiver:
         plt.tight_layout()  # Adjust layout to make room for the labels
         plt.show()
 
-    def moving_average(self, signal, window_size):
-        return np.convolve(signal, np.ones(window_size) / window_size, mode='same')
 
     def pulse_detection(self, signal):
         pass
 
     def decipher(self, signal):
-        self.deciphered_data = np.append(self.deciphered_data, 10)
+        self.deciphered_data = np.append(self.deciphered_data, 1)
+        self.deciphered_data = np.append(self.deciphered_data, 0)
 
 
 if __name__ == "__main__":
     rc = Receiver()
     i = 0
     data = np.array([])
-    data_str = rc.read()
     try:
         while True:
             data_str = rc.read()
-            if data_str is not []:
+            if data_str:
                 float_data = [float(i) for i in data_str]
                 data = np.append(data, float_data)
                 rc.decipher(float_data)
@@ -118,6 +116,8 @@ if __name__ == "__main__":
                     rc.plot_spectrogram(data)
                     #time.sleep(5)
                     data = np.array([])
+                i += 1
+
     finally:
         rc.channel.close()
         if tf.BER_SNR_SIMULATION:

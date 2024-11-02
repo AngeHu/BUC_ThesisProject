@@ -2,10 +2,10 @@
 
 # debug e ber/snr simulation non possono essere contemporaneamente attivi
 DEBUG = False
-BER_SNR_SIMULATION = False
+BER_SNR_SIMULATION = True
 
 # ber/snr simulation parameters
-num_bits = 1000  # Number of bits to transmit
+num_bits = 6  # Number of bits to transmit
 
 T_frame = 1 # periodo totale del segnale - 1 sec
 f_min = 18000 # frequenza minima

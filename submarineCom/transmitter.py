@@ -36,14 +36,14 @@ def encode_signal(data):
             encoded_signal.append(2)
         elif data[i] == 1 and data[i+1] == 0:
             encoded_signal.append(3)
-    print("Encoded signal: ", encoded_signal)
+    if tf.DEBUG: print("Encoded signal: ", encoded_signal)
     return encoded_signal
 
 
 class Transmitter():
     def __init__(self):
         self.channel = channel.Channel('w')
-        print("Transmitter ON")
+        if not tf.BER_SNR_SIMULATION: ("Transmitter ON")
         self.x = np.linspace(0, tf.T_frame, tf.f_sampling*4)
         self.slot = np.linspace(0, tf.t_slot, tf.f_sampling)
         self.signal = []
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     if tf.BER_SNR_SIMULATION:
         # generate bit sequence
         data = np.random.randint(0, 2, tf.num_bits)
-        print("Bits: ", data)
+        print(data)
         SNR = float(sys.argv[1])
         # turn snr to linear scale
         SNR = 10 ** (SNR / 10)
@@ -93,7 +93,6 @@ if __name__ == "__main__":
     sig = np.array([])
 
     while i < len(data):
-        print(i)
         frq = np.append(frq, transmitter.generate_frequency(tm.timeInterval[data[i]]))
         generated_sig, E_signal = transmitter.generate_chirp(tm.timeInterval[data[i]])
         sig = np.append(sig, generated_sig)
@@ -103,15 +102,15 @@ if __name__ == "__main__":
         transmitter.send_signal(E_signal / SNR) # send signal with noise
         i += 1
         if i % 4 == 0: # plot every 4 signal
-            if not tf.BER_SNR_SIMULATION: (np.linspace(0, 4 * tf.T_frame, 4 * 4 * tf.f_sampling), frq, sig)
+            if not tf.BER_SNR_SIMULATION: plot_function(np.linspace(0, 4 * tf.T_frame, 4 * 4 * tf.f_sampling), frq, sig)
             frq = np.array([])
             sig = np.array([])
 
+    time.sleep(10) # wait for receiver to finish
+
     transmitter.channel.close()
 
-    if tf.BER_SNR_SIMULATION:
-        print(data)
-    else:
+    if not tf.BER_SNR_SIMULATION:
         print("Transmitter OFF")
 
 
