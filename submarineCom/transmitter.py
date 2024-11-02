@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 import channel
 import params as tf
 import time
+import sys
 
 # plot every 4*2 bits
 def plot_function(x, y_freq, y_sig):
@@ -27,13 +28,13 @@ def plot_function(x, y_freq, y_sig):
 def encode_signal(data):
     encoded_signal = []
     for i in range(0, len(data), 2):
-        if data[i] == '0' and data[i+1] == '0':
+        if data[i] == 0 and data[i+1] == 0:
             encoded_signal.append(0)
-        elif data[i] == '0' and data[i+1] == '1':
+        elif data[i] == 0 and data[i+1] == 1:
             encoded_signal.append(1)
-        elif data[i] == '1' and data[i+1] == '1':
+        elif data[i] == 1 and data[i+1] == 1:
             encoded_signal.append(2)
-        elif data[i] == '1' and data[i+1] == '0':
+        elif data[i] == 1 and data[i+1] == 0:
             encoded_signal.append(3)
     print("Encoded signal: ", encoded_signal)
     return encoded_signal
@@ -71,45 +72,47 @@ class Transmitter():
 if __name__ == "__main__":
     if tf.BER_SNR_SIMULATION:
         # generate bit sequence
-        bits = np.random.randint(0, 2, tf.num_bits)
-        print("Bits: ", bits)
-        SNR = np.arange(0, 21, 2)
+        data = np.random.randint(0, 2, tf.num_bits)
+        print("Bits: ", data)
+        SNR = float(sys.argv[1])
+        # turn snr to linear scale
+        SNR = 10 ** (SNR / 10)
     else:
         file = open("test/test1.txt", 'r')
         # read data from file adn put in a string
-        data = file.read()
+        read_data = file.read()
+        data = [float(char) for char in read_data]
         print("Data: ", data)
         SNR = tf.SNR
     tm = tf.TimeFrame()
     transmitter = Transmitter()
 
-
     i = 0
-    # info = "00100100"
     data = encode_signal(data)
     frq = np.array([])
     sig = np.array([])
-    try:
-        while i < len(data):
-            frq = np.append(frq, transmitter.generate_frequency(tm.timeInterval[data[i]]))
-            generated_sig, E_signal = transmitter.generate_chirp(tm.timeInterval[data[i]])
-            sig = np.append(sig, generated_sig)
-            if tf.DEBUG:
-                print("Power signal: ", E_signal)
-                print("Power noise: ", E_signal / SNR)
-            transmitter.send_signal(E_signal / SNR) # send signal with noise
-            i += 1
-            if i % 4 == 0: # plot every 4 signal
-                if not tf.BER_SNR_SIMULATION: (np.linspace(0, 4 * tf.T_frame, 4 * 4 * tf.f_sampling), frq, sig)
-                frq = np.array([])
-                sig = np.array([])
-    finally:
-        print("Transmitter OFF")
-        transmitter.channel.close()
-    time.sleep(100);
+
+    while i < len(data):
+        print(i)
+        frq = np.append(frq, transmitter.generate_frequency(tm.timeInterval[data[i]]))
+        generated_sig, E_signal = transmitter.generate_chirp(tm.timeInterval[data[i]])
+        sig = np.append(sig, generated_sig)
+        if tf.DEBUG:
+            print("Power signal: ", E_signal)
+            print("Power noise: ", E_signal / SNR)
+        transmitter.send_signal(E_signal / SNR) # send signal with noise
+        i += 1
+        if i % 4 == 0: # plot every 4 signal
+            if not tf.BER_SNR_SIMULATION: (np.linspace(0, 4 * tf.T_frame, 4 * 4 * tf.f_sampling), frq, sig)
+            frq = np.array([])
+            sig = np.array([])
+
+    transmitter.channel.close()
 
     if tf.BER_SNR_SIMULATION:
-        print(bits)
+        print(data)
+    else:
+        print("Transmitter OFF")
 
 
 

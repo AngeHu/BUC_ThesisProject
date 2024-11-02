@@ -1,6 +1,7 @@
 import os
 import params as tf
 import numpy as np
+import sys
 
 fifo_path  = "/tmp/channel"
 
@@ -8,14 +9,13 @@ class Channel:
     def __delete__(self):
         if os.path.exists(fifo_path):
             os.remove(fifo_path)
-            if not tf.BER_SNR_SIMULATION:
-                print(f"Channel named {fifo_path} is deleted successfully")
+            print(f"Channel named {fifo_path} is deleted successfully", file=sys.stderr)
 
     def open(self, mode):
         if mode == 'r' or mode == 'w':
             self.fifo = open(self.channel, mode)
         else:
-            print("Mode not valid")
+            print("Mode not valid", file=sys.stderr)
             self.__delete__()
             exit(1)
 
@@ -27,17 +27,17 @@ class Channel:
         self.permission = 0o600
         if not(os.path.exists(self.channel)):
             os.mkfifo(self.channel, self.permission)
-            if not tf.BER_SNR_SIMULATION: print(f"FIFO named {self.channel} is created successfully")
+            print(f"FIFO named {self.channel} is created successfully", file=sys.stderr)
         else:
-            if not tf.BER_SNR_SIMULATION: print(f"FIFO named {self.channel} already exists")
+            print(f"FIFO named {self.channel} already exists", file=sys.stderr)
         self.open(mode)
 
     def add_noise(self, signal, noise_level):
         noise = np.random.normal(0, 1, len(signal)) * np.sqrt(noise_level)
         # power_noise calcolato prendendo un quarto del rumore e diviso per lunghezza del chirp
-        if tf.DEBUG and not tf.BER_SNR_SIMULATION:
-            print("Power noise (measured): ", sum(noise[0:tf.f_sampling]**2) / tf.f_sampling) #se diviso per len(signal) da la metà
-            print("Check SNR: ", sum(signal**2) / sum(noise[0:tf.f_sampling]**2))
+        if tf.DEBUG:
+            print("Power noise (measured): ", sum(noise[0:tf.f_sampling]**2) / tf.f_sampling, file=sys.stderr) #se diviso per len(signal) da la metà
+            print("Check SNR: ", sum(signal**2) / sum(noise[0:tf.f_sampling]**2), file=sys.stderr)
         signal = signal + noise
         return signal
         
@@ -47,7 +47,7 @@ class Channel:
             self.fifo.write(data)
             self.fifo.flush()  # Ensure data is written immediately
         except BrokenPipeError:
-            if not tf.BER_SNR_SIMULATION: print("BrokenPipeError: The receiver has closed the pipe.")
+            print("BrokenPipeError: The receiver has closed the pipe.", file=sys.stderr)
             self.fifo.close()
 
     def send_signal(self, signal, noise_level):

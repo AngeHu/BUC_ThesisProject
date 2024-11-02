@@ -39,6 +39,7 @@ class Receiver:
         print("Receiver ON")
         self.channel.open('r')
         self.correlation = []
+        self.deciphered_data = []
 
 
     def read(self):
@@ -90,9 +91,7 @@ class Receiver:
         pass
 
     def decipher(self, signal):
-        pass
-
-
+        self.deciphered_data = np.append(self.deciphered_data, 10)
 
 
 if __name__ == "__main__":
@@ -108,18 +107,21 @@ if __name__ == "__main__":
                 data = np.append(data, float_data)
                 rc.decipher(float_data)
 
-                if len(data) >= 4 * tf.T_frame * tf.f_sampling:
+                if len(data) >= 4 * 4 * tf.T_frame * tf.f_sampling and not tf.BER_SNR_SIMULATION:
                     # plot data
-                    #rc.plot_data(data)
+                    rc.plot_data(data)
 
                     # correlation
-                    #rc.plot_correlation(data)
+                    rc.plot_correlation(data)
 
                     # spectrogram
-                    # rc.plot_spectrogram(data)
+                    rc.plot_spectrogram(data)
                     #time.sleep(5)
                     data = np.array([])
     finally:
         rc.channel.close()
-        print("Receiver OFF")
+        if tf.BER_SNR_SIMULATION:
+            print(rc.deciphered_data)
+        else:
+            print("Receiver OFF")
         exit(0)
