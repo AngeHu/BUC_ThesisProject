@@ -1,5 +1,11 @@
 #TODO: aggiustare frequenza minima e massima a 18k e 38k
-DEBUG = True
+
+# debug e ber/snr simulation non possono essere contemporaneamente attivi
+DEBUG = False
+BER_SNR_SIMULATION = False
+
+# ber/snr simulation parameters
+num_bits = 1000  # Number of bits to transmit
 
 T_frame = 1 # periodo totale del segnale - 1 sec
 f_min = 18000 # frequenza minima
@@ -9,7 +15,7 @@ t_slot = T_frame/4 # periodo segnale
 t_sample = t_slot # tempo di campionamento
 
 
-SNR = 1 # rapporto segnale rumore
+SNR = 2 # rapporto segnale rumore
 
 class Period:
     def __init__(self, start, end, data):
