@@ -40,7 +40,6 @@ class Channel:
             print("Check SNR: ", sum(signal**2) / sum(noise[0:tf.f_sampling]**2), file=sys.stderr)
         signal = signal + noise
         return signal
-        
 
     def send_data(self, data):
         try:

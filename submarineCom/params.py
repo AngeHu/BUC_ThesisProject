@@ -3,9 +3,11 @@
 # debug e ber/snr simulation non possono essere contemporaneamente attivi
 DEBUG = False
 BER_SNR_SIMULATION = True
+SAVE_IMG = False
 
 # ber/snr simulation parameters
-num_bits = 6  # Number of bits to transmit
+num_bits = 8  # Number of bits to transmit
+img_directory = "./img/mean_peak/"  # directory
 
 T_frame = 1 # periodo totale del segnale - 1 sec
 f_min = 18000 # frequenza minima
@@ -15,7 +17,7 @@ t_slot = T_frame/4 # periodo segnale
 t_sample = t_slot # tempo di campionamento
 
 
-SNR = 2 # rapporto segnale rumore
+SNR = 10 # rapporto segnale rumore
 
 class Period:
     def __init__(self, start, end, data):
@@ -28,10 +30,10 @@ class TimeFrame:
     def __init__(self):
         # intervallo di 2.5 sec
 
-        self.lapse1 = Period(0, 1, (0, 0))
-        self.lapse2 = Period(1, 2 , (0, 1))
-        self.lapse3 = Period(2 , 3 , (1, 1))
-        self.lapse4 = Period(3 , 4 , (1, 0))
+        self.lapse1 = Period(0, 1, [0, 0])
+        self.lapse2 = Period(1, 2 , [0, 1])
+        self.lapse3 = Period(2 , 3 , [1, 1])
+        self.lapse4 = Period(3 , 4 , [1, 0])
         self.timeInterval = [self.lapse1, self.lapse2, self.lapse3, self.lapse4]
 
         self.slot = [0, 1, 2, 3]

@@ -81,7 +81,7 @@ if __name__ == "__main__":
         file = open("test/test1.txt", 'r')
         # read data from file adn put in a string
         read_data = file.read()
-        data = [float(char) for char in read_data]
+        data = [int(char) for char in read_data]
         print("Data: ", data)
         SNR = tf.SNR
     tm = tf.TimeFrame()

@@ -4,20 +4,24 @@
 # receiver deve riuscire a ricostruire correttamente ilsegnale..più o meno
 # sicruamente ci sarà perdita di segnale!
 import time
-
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib.animation import FuncAnimation
 import channel
 import params as tf
 from scipy.signal import chirp, spectrogram, correlate, stft
 from scipy.fft import fftshift
+from scipy.signal import butter, lfilter, find_peaks
+import sys
+
+SAVE_IMG = tf.SAVE_IMG
+img_directory = tf.img_directory
 
 # increase agg.path.chunksize
 plt.rcParams['agg.path.chunksize'] = 10000
 
-t = np.linspace(0, tf.t_slot, tf.f_sampling) # vettore tempo
-chirp_signal = chirp(t, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
+t_slot = np.linspace(0, tf.t_slot, tf.f_sampling) # vettore tempo
+t_frame = np.linspace(0, tf.T_frame, tf.f_sampling * 4) # vettore tempo
+chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
 
 def plot_function(x, y_sig):
     if(len(x) != len(y_sig)):
@@ -27,7 +31,7 @@ def plot_function(x, y_sig):
     sig, = ax.plot(x, y_sig, color='r', label='Segnale')  # Crea il grafico
 
     ax.set_xlabel('Time(s)')  # Aggiunge un'etichetta all'asse x
-    ax.set_ylabel('Frequenza')  # Aggiunge un'etichetta all'asse y1
+    ax.set_ylabel('Ampiezza')  # Aggiunge un'etichetta all'asse y1
     ax.set_xlim(0, 4*tf.T_frame)
     ax.set_ylim(-5, 5)
     plt.grid(True)  # Aggiunge una griglia al grafico (opzionale)
@@ -40,6 +44,7 @@ class Receiver:
         self.channel.open('r')
         self.correlation = []
         self.deciphered_data = np.array([])
+        self.tm = tf.TimeFrame()
 
 
     def read(self):
@@ -67,7 +72,7 @@ class Receiver:
     def plot_spectrogram(self, signal: np.array):
         print("Plotting spectrogram")
         print("Signal length: ", len(signal))
-        f, t, Sxx = spectrogram(signal, fs=tf.f_sampling, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
+        f, t, Sxx = spectrogram(signal, fs=4*tf.f_sampling, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
                                 nfft=2048)
         # f, t, Sxx = stft(signal, fs=tf.f_sampling, nperseg=256)
         # Sxx_magnitude = np.abs(Sxx)
@@ -84,13 +89,61 @@ class Receiver:
         plt.tight_layout()  # Adjust layout to make room for the labels
         plt.show()
 
+    # decode signal
+    def lowpass_filter(self, data, fs=tf.f_sampling, lowcut=tf.f_max, order=8):
+        b, a = butter(order, lowcut, fs=fs, btype='low')
 
-    def pulse_detection(self, signal):
-        pass
+        filtered_data = lfilter(b, a, data)
+        return filtered_data
 
-    def decipher(self, signal):
-        self.deciphered_data = np.append(self.deciphered_data, 1)
-        self.deciphered_data = np.append(self.deciphered_data, 0)
+    def decode_signal(self, signal):
+        filtered_signal = self.lowpass_filter(signal)
+        correlated_signal = correlate(filtered_signal, chirp_signal, mode='same')
+
+        # search for chirp based on mean and std
+        mean_corr = np.mean(correlated_signal)
+        corr_std = np.std(correlated_signal)
+        threshold = mean_corr + 3 * corr_std # 3 sigma
+        peaks, _ = find_peaks(correlated_signal, height=threshold)
+        mean_peak = np.mean(t_frame[peaks])
+
+        # search for chirp based on peak density
+
+        if tf.DEBUG:
+            print("Mean correlation: ", mean_corr)
+            print("Correlation std: ", corr_std)
+            print("Threshold: ", threshold)
+            # decode signal
+            print("Mean peak: ", mean_peak)
+
+        # check in which interval the peak is
+        if mean_peak < self.tm.lapse1.end*tf.t_slot and mean_peak > self.tm.lapse1.start*tf.t_slot:
+            self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse1.data)
+        elif mean_peak < self.tm.lapse2.end*tf.t_slot and mean_peak > self.tm.lapse2.start*tf.t_slot:
+            self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse2.data)
+        elif mean_peak < self.tm.lapse3.end*tf.t_slot and mean_peak > self.tm.lapse3.start*tf.t_slot:
+            self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse3.data)
+        elif mean_peak < self.tm.lapse4.end*tf.t_slot and mean_peak > self.tm.lapse4.start*tf.t_slot:
+            self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse4.data)
+        else:
+            # print on stderr
+            print("No valid peak found", file=sys.stderr)
+        # plot correlation
+
+        plt.figure()
+        plt.plot(t_frame, correlated_signal)
+        plt.plot(t_frame[peaks], correlated_signal[peaks], "x", color="red")
+        plt.title("Correlation with Chirp")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Correlation")
+        plt.grid(True)
+        if SAVE_IMG:
+            timestamp = time.time()
+            timestamp = str(timestamp).replace(".", "")
+            plt.savefig(img_directory + timestamp + ".png")
+        else:
+            plt.show()
+
 
 
 if __name__ == "__main__":
@@ -103,25 +156,24 @@ if __name__ == "__main__":
             if data_str:
                 float_data = [float(i) for i in data_str]
                 data = np.append(data, float_data)
-                rc.decipher(float_data)
+                rc.decode_signal(float_data)
 
                 if len(data) >= 4 * 4 * tf.T_frame * tf.f_sampling and not tf.BER_SNR_SIMULATION:
                     # plot data
-                    rc.plot_data(data)
+                    #rc.plot_data(data)
 
                     # correlation
-                    rc.plot_correlation(data)
+                    #rc.plot_correlation(data)
 
                     # spectrogram
-                    rc.plot_spectrogram(data)
+                    #rc.plot_spectrogram(data)
                     #time.sleep(5)
                     data = np.array([])
                 i += 1
 
     finally:
+        print(rc.deciphered_data)
         rc.channel.close()
-        if tf.BER_SNR_SIMULATION:
-            print(rc.deciphered_data)
-        else:
+        if not tf.BER_SNR_SIMULATION:
             print("Receiver OFF")
         exit(0)
