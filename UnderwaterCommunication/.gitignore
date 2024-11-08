@@ -1,0 +1,16 @@
+# ignore .idea folder
+.idea/
+# ignore .DS_Store file
+.DS_Store
+# ignore .pyc files
+*.pyc
+# ignore __pycache__ folder
+__pycache__/
+# ignore .vscode folder
+.vscode/
+# ignore .pytest_cache folder
+.pytest_cache/
+# ignore .coverage file
+.coverage
+# ignore .pytest_cache folder
+.pytest_cache/
