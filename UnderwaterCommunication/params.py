@@ -2,7 +2,7 @@
 
 # debug e ber/snr simulation non possono essere contemporaneamente attivi
 DEBUG = False
-BER_SNR_SIMULATION = True
+BER_SNR_SIMULATION = False
 
 # ber/snr simulation parameters
 num_bits = 6  # Number of bits to transmit
