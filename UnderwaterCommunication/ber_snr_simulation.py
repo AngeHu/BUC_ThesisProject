@@ -5,13 +5,14 @@ import re # regular expression
 import matplotlib.pyplot as plt
 import os
 
+
 if params.BER_SNR_SIMULATION: # to run the simulation set BER_SNR_SIMULATION = True in params.py
     if not os.path.exists(params.img_directory):
         os.makedirs("./img")
         os.makedirs(params.img_directory)
     ber = []
     i = 0
-    snr_db = np.arrange(-10, 10, 1)
+    snr_db = np.arange(-20, 10, 1) # SNR range from -100 to 20 dB
 
     for i in range(len(snr_db)):
         print("SNR: ", snr_db[i])
@@ -65,5 +66,5 @@ if params.BER_SNR_SIMULATION: # to run the simulation set BER_SNR_SIMULATION = T
     plt.grid(True)
     plt.tight_layout()
     plt.show()
-    plt.savefig(params.img_directory+'ber_snr8.png')
+    plt.savefig(params.img_directory+'ber_snr.png')
 

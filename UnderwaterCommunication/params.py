@@ -6,7 +6,7 @@ BER_SNR_SIMULATION = True
 SAVE_IMG = False
 
 # ber/snr simulation parameters
-num_bits = 8  # Number of bits to transmit
+num_bits = 1028  # Number of bits to transmit
 img_directory = "./img/mean_peak/"  # directory
 
 T_frame = 1 # periodo totale del segnale - 1 sec

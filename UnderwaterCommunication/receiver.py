@@ -130,6 +130,8 @@ class Receiver:
             print("No valid peak found", file=sys.stderr)
         # plot correlation
 
+        # disable plotting for BER/SNR simulation
+        '''
         plt.figure()
         plt.plot(t_frame, correlated_signal)
         plt.plot(t_frame[peaks], correlated_signal[peaks], "x", color="red")
@@ -143,6 +145,7 @@ class Receiver:
             plt.savefig(img_directory + timestamp + ".png")
         else:
             plt.show()
+        '''
 
 
 

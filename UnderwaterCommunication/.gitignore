@@ -12,3 +12,11 @@ __pycache__/
 .pytest_cache/
 # ignore .coverage file
 .coverage
+
+# ignore .gitignore file
+.gitignore
+
+# files not related to simulation
+animation.py
+data.txt
+main.py
