@@ -5,8 +5,13 @@ DEBUG = False
 BER_SNR_SIMULATION = True
 SAVE_IMG = False
 
+# chirp decoding - only one of the two can be active
+MAX_PEAK = False # if false, use MEAN_PEAK
+MEAN_PEAK = False
+SLOT_PEAK = True
+
 # ber/snr simulation parameters
-num_bits = 1028  # Number of bits to transmit
+num_bits = 1024  # Number of bits to transmit
 img_directory = "./img/mean_peak/"  # directory
 
 T_frame = 1 # periodo totale del segnale - 1 sec

@@ -12,7 +12,7 @@ if params.BER_SNR_SIMULATION: # to run the simulation set BER_SNR_SIMULATION = T
         os.makedirs(params.img_directory)
     ber = []
     i = 0
-    snr_db = np.arange(-20, 10, 1) # SNR range from -100 to 20 dB
+    snr_db = np.arange(-25, 5, 1) # SNR range from -25 to 5 dB
 
     for i in range(len(snr_db)):
         print("SNR: ", snr_db[i])
@@ -59,12 +59,20 @@ if params.BER_SNR_SIMULATION: # to run the simulation set BER_SNR_SIMULATION = T
     plt.figure()
     plt.plot(snr_db, ber)
     plt.yscale('log')
-    plt.ylim(10**-3, 0.5)
+    plt.ylim(None, 0.5)
     plt.xlabel("SNR [dB]")
     plt.ylabel("BER")
     plt.title("BER vs SNR")
     plt.grid(True)
     plt.tight_layout()
     plt.show()
-    plt.savefig(params.img_directory+'ber_snr.png')
-
+    file_name = params.img_directory+'ber_snr'+str(params.num_bits)+'.png'
+    if os.path.exists(file_name):
+        i = 1
+        while os.path.exists(file_name):
+            if i == 1:
+                file_name = file_name[:-4] + "_" + str(i) + ".png"
+            else:
+                file_name = file_name[:-5] + str(i) + ".png"
+            i += 1
+    plt.savefig(file_name)
