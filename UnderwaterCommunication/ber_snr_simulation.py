@@ -7,8 +7,9 @@ import os
 
 
 if params.BER_SNR_SIMULATION: # to run the simulation set BER_SNR_SIMULATION = True in params.py
-    if not os.path.exists(params.img_directory):
+    if not os.path.exists("./img"):
         os.makedirs("./img")
+    if not os.path.exists(params.img_directory):
         os.makedirs(params.img_directory)
     ber = []
     i = 0
