@@ -20,3 +20,5 @@ __pycache__/
 animation.py
 data.txt
 main.py
+test/test1.txt
+test/test2.txt
