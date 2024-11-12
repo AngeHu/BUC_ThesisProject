@@ -6,6 +6,23 @@ import params as tf
 import time
 import sys
 
+if tf.DEBUG:
+    import cProfile
+    import atexit
+    import pstats
+
+    # Set up profiling to save to a file
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    # Save profile results to a file on exit
+    def save_profile():
+        with open('transmitter_profile.prof', 'w') as f:  # Use 'receiver_profile.prof' for receiver.py
+            ps = pstats.Stats(profiler, stream=f)
+            ps.strip_dirs().sort_stats('cumulative').print_stats()
+
+    atexit.register(save_profile)
+
 # plot every 4*2 bits
 def plot_function(x, y_freq, y_sig):
     figure, (ax1, ax2) = plt.subplots(2, 1)

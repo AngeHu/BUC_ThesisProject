@@ -1,8 +1,8 @@
 #TODO: aggiustare frequenza minima e massima a 18k e 38k
 
 # debug e ber/snr simulation non possono essere contemporaneamente attivi
-DEBUG = False
-BER_SNR_SIMULATION = True
+DEBUG = True
+BER_SNR_SIMULATION = False
 SAVE_IMG = False
 
 # chirp decoding - only one of the two can be active

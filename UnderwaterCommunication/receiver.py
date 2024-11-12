@@ -13,6 +13,23 @@ from scipy.fft import fftshift
 from scipy.signal import butter, lfilter, find_peaks
 import sys
 
+if tf.DEBUG:
+    import cProfile
+    import atexit
+    import pstats
+
+    # Set up profiling to save to a file
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    # Save profile results to a file on exit
+    def save_profile():
+        with open('receiver_profile.prof', 'w') as f:  # Use 'receiver_profile.prof' for receiver.py
+            ps = pstats.Stats(profiler, stream=f)
+            ps.strip_dirs().sort_stats('cumulative').print_stats()
+
+    atexit.register(save_profile)
+
 SAVE_IMG = tf.SAVE_IMG
 img_directory = tf.img_directory
 METHOD = 1 if tf.MAX_PEAK else 2 if tf.MEAN_PEAK else 3 if tf.SLOT_PEAK else 0
@@ -245,8 +262,7 @@ if __name__ == "__main__":
         print("Error: ", e, file=sys.stderr)
     finally:
         rc.channel.close()
-        if tf.BER_SNR_SIMULATION:
-            print(rc.deciphered_data)
-        else:
+        print(rc.deciphered_data)
+        if not tf.BER_SNR_SIMULATION:
             print("Receiver OFF")
         exit(0)
