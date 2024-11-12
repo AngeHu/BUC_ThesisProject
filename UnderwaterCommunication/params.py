@@ -11,13 +11,15 @@ MEAN_PEAK = False
 SLOT_PEAK = True
 
 # ber/snr simulation parameters
-num_bits = 1024  # Number of bits to transmit
+num_bits = 8  # Number of bits to transmit
 img_directory = "./img/slot_peak/"  # directory
 
 T_frame = 1 # periodo totale del segnale - 1 sec
 f_min = 18000 # frequenza minima
 f_max = 38000 # frequenza massima
 f_sampling = 96000 # frequenza campionamento
+samples = f_sampling * T_frame # numero di campioni
+chirp_samples = samples/4 # numero di campioni per chirp
 t_slot = T_frame/4 # periodo segnale
 t_sample = t_slot # tempo di campionamento
 

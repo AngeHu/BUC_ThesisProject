@@ -20,8 +20,8 @@ METHOD = 1 if tf.MAX_PEAK else 2 if tf.MEAN_PEAK else 3 if tf.SLOT_PEAK else 0
 # increase agg.path.chunksize
 plt.rcParams['agg.path.chunksize'] = 10000
 
-t_slot = np.linspace(0, tf.t_slot, tf.f_sampling) # vettore tempo
-t_frame = np.linspace(0, tf.T_frame, tf.f_sampling * 4) # vettore tempo
+t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples) # vettore tempo
+t_frame = np.linspace(0, tf.T_frame, tf.samples) # vettore tempo
 chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
 
 def mean(x, indices):
@@ -66,7 +66,7 @@ class Receiver:
         print("Plotting correlation")
         global chirp_signal
         self.correlation = correlate(signal, chirp_signal, mode='full')
-        lags = np.arange(-len(signal) + 1, len(chirp_signal)) / (4 * tf.f_sampling)
+        lags = np.arange(-len(signal) + 1, len(chirp_signal)) / (tf.samples)
         # lags = np.arange(0, len(signal))
         plt.figure()
         plt.plot(lags, self.correlation)
@@ -78,9 +78,9 @@ class Receiver:
     def plot_spectrogram(self, signal: np.array):
         print("Plotting spectrogram")
         print("Signal length: ", len(signal))
-        f, t, Sxx = spectrogram(signal, fs=4*tf.f_sampling, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
+        f, t, Sxx = spectrogram(signal, fs=tf.samples, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
                                 nfft=2048)
-        # f, t, Sxx = stft(signal, fs=tf.f_sampling, nperseg=256)
+        # f, t, Sxx = stft(signal, fs=tf.samples, nperseg=256)
         # Sxx_magnitude = np.abs(Sxx)
         # plt.pcolormesh(t, f, Sxx_magnitude)
         # plt.ylabel('Frequency [Hz]')
@@ -96,7 +96,7 @@ class Receiver:
         plt.show()
 
     # decode signal
-    def lowpass_filter(self, data, fs=tf.f_sampling, lowcut=tf.f_max, order=8):
+    def lowpass_filter(self, data, fs=tf.chirp_samples, lowcut=tf.f_max, order=8):
         b, a = butter(order, lowcut, fs=fs, btype='low')
 
         filtered_data = lfilter(b, a, data)
@@ -143,13 +143,13 @@ class Receiver:
         # cerca picco massimo
         elif METHOD == 1:
             max_peak_index = np.argmax(amplitude_envelope)
-            if max_peak_index < self.tm.lapse1.end*tf.f_sampling and max_peak_index > self.tm.lapse1.start*tf.f_sampling:
+            if max_peak_index < self.tm.lapse1.end*tf.chirp_samples and max_peak_index > self.tm.lapse1.start*tf.chirp_samples:
                 self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse1.data)
-            elif max_peak_index < self.tm.lapse2.end*tf.f_sampling and max_peak_index > self.tm.lapse2.start*tf.f_sampling:
+            elif max_peak_index < self.tm.lapse2.end*tf.chirp_samples and max_peak_index > self.tm.lapse2.start*tf.chirp_samples:
                 self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse2.data)
-            elif max_peak_index < self.tm.lapse3.end*tf.f_sampling and max_peak_index > self.tm.lapse3.start*tf.f_sampling:
+            elif max_peak_index < self.tm.lapse3.end*tf.chirp_samples and max_peak_index > self.tm.lapse3.start*tf.chirp_samples:
                 self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse3.data)
-            elif max_peak_index < self.tm.lapse4.end*tf.f_sampling and max_peak_index > self.tm.lapse4.start*tf.f_sampling:
+            elif max_peak_index < self.tm.lapse4.end*tf.chirp_samples and max_peak_index > self.tm.lapse4.start*tf.chirp_samples:
                 self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse4.data)
             else:
                 # print on stderr
@@ -165,16 +165,16 @@ class Receiver:
 
             mean_peaks = np.zeros(4)
             # slot 1
-            peaks_slot1 = peaks[np.where(peaks < tf.f_sampling)]
+            peaks_slot1 = peaks[np.where(peaks < tf.chirp_samples)]
             mean_peaks[0] = mean(t_frame, peaks_slot1)
             # slot 2
-            peaks_slot2 = peaks[np.where((peaks >= tf.f_sampling) & (peaks < 2*tf.f_sampling))]
+            peaks_slot2 = peaks[np.where((peaks >= tf.chirp_samples) & (peaks < 2*tf.chirp_samples))]
             mean_peaks[1] = mean(t_frame, peaks_slot2)
             # slot 3
-            peaks_slot3 = peaks[np.where((peaks >= 2*tf.f_sampling) & (peaks < 3*tf.f_sampling))]
+            peaks_slot3 = peaks[np.where((peaks >= 2*tf.chirp_samples) & (peaks < 3*tf.chirp_samples))]
             mean_peaks[2] = mean(t_frame, peaks_slot3)
             # slot 4
-            peaks_slot4 = peaks[np.where(peaks >= 3*tf.f_sampling)]
+            peaks_slot4 = peaks[np.where(peaks >= 3*tf.chirp_samples)]
             mean_peaks[3] = mean(t_frame, peaks_slot4)
 
             max_peak = np.argmax(mean_peaks)
@@ -226,7 +226,7 @@ if __name__ == "__main__":
                 data = np.append(data, float_data)
                 rc.decode_signal(float_data)
 
-                if len(data) >= 4 * 4 * tf.T_frame * tf.f_sampling and not tf.BER_SNR_SIMULATION:
+                if len(data) >= 4 * tf.T_frame * tf.samples and not tf.BER_SNR_SIMULATION:
                     # plot data
                     #rc.plot_data(data)
 
