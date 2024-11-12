@@ -32,7 +32,7 @@ if params.BER_SNR_SIMULATION: # to run the simulation set BER_SNR_SIMULATION = T
             if output1[n] != output2[n]:
                 error_count += 1
 
-        error_count = error_count + (len(output2)-params.num_bits) # bits that hasn't been received
+        # error_count = error_count + (len(output2)-params.num_bits) # bits that hasn't been received
 
         ber.append(error_count/params.num_bits)
 

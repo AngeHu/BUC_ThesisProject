@@ -44,21 +44,21 @@ class Transmitter():
     def __init__(self):
         self.channel = channel.Channel('w')
         if not tf.BER_SNR_SIMULATION: ("Transmitter ON")
-        self.x = np.linspace(0, tf.T_frame, tf.f_sampling*4)
-        self.slot = np.linspace(0, tf.t_slot, tf.f_sampling)
+        self.x = np.linspace(0, tf.T_frame, tf.sig_samples)
+        self.slot = np.linspace(0, tf.t_slot, tf.chirp_samples)
         self.signal = []
         self.frequency = []
 
     # must visualize 2 graphs: one for frequency and one for signal
     def generate_frequency(self, interval):
-        self.frequency = np.full(tf.f_sampling * 4, 0)
-        self.frequency[interval.start*tf.f_sampling: interval.end*tf.f_sampling] = np.linspace(tf.f_min, tf.f_max, tf.f_sampling)
+        self.frequency = np.full(tf.sig_samples, 0)
+        self.frequency[interval.start*tf.chirp_samples: interval.end*tf.chirp_samples] = np.linspace(tf.f_min, tf.f_max, tf.chirp_samples)
         #plot_function(self.x, self.frequency, "Frequenza", "t", "f", False)
         return self.frequency
 
     def generate_chirp(self, interval):
         self.signal = np.sin(2 * np.pi * self.frequency * (self.x - interval.start * tf.t_slot))
-        e_signal = sum(self.signal**2) / tf.f_sampling
+        e_signal = sum(self.signal**2) / tf.chirp_samples
         return self.signal, e_signal
 
     def send_signal(self, noise):
@@ -70,6 +70,7 @@ class Transmitter():
 
 
 if __name__ == "__main__":
+    print(tf.chirp_samples)
     if tf.BER_SNR_SIMULATION:
         # generate bit sequence
         data = np.random.randint(0, 2, tf.num_bits)
@@ -81,7 +82,7 @@ if __name__ == "__main__":
         file = open("test/test1.txt", 'r')
         # read data from file adn put in a string
         read_data = file.read()
-        data = [float(char) for char in read_data]
+        data = [int(char) for char in read_data]
         print("Data: ", data)
         SNR = tf.SNR
     tm = tf.TimeFrame()
@@ -102,7 +103,7 @@ if __name__ == "__main__":
         transmitter.send_signal(E_signal / SNR) # send signal with noise
         i += 1
         if i % 4 == 0: # plot every 4 signal
-            if not tf.BER_SNR_SIMULATION: plot_function(np.linspace(0, 4 * tf.T_frame, 4 * 4 * tf.f_sampling), frq, sig)
+            if not tf.BER_SNR_SIMULATION: plot_function(np.linspace(0, 4 * tf.T_frame, 4 * 4 * tf.chirp_samples), frq, sig)
             frq = np.array([])
             sig = np.array([])
 
@@ -112,7 +113,6 @@ if __name__ == "__main__":
 
     if not tf.BER_SNR_SIMULATION:
         print("Transmitter OFF")
-
 
 
 

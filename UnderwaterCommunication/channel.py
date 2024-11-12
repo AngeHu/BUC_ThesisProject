@@ -36,8 +36,8 @@ class Channel:
         noise = np.random.normal(0, 1, len(signal)) * np.sqrt(noise_level)
         # power_noise calcolato prendendo un quarto del rumore e diviso per lunghezza del chirp
         if tf.DEBUG:
-            print("Power noise (measured): ", sum(noise[0:tf.f_sampling]**2) / tf.f_sampling, file=sys.stderr) #se diviso per len(signal) da la metà
-            print("Check SNR: ", sum(signal**2) / sum(noise[0:tf.f_sampling]**2), file=sys.stderr)
+            print("Power noise (measured): ", sum(noise[0:tf.chirp_samples]**2) / tf.chirp_samples, file=sys.stderr) #se diviso per len(signal) da la metà
+            print("Check SNR: ", sum(signal**2) / sum(noise[0:tf.chirp_samples]**2), file=sys.stderr)
         signal = signal + noise
         return signal
         
@@ -52,7 +52,7 @@ class Channel:
 
     def send_signal(self, signal, noise_level):
         noisy_signal = self.add_noise(signal, noise_level)
-        for i in range(tf.f_sampling * 4):
+        for i in range(tf.sig_samples):
             formatted_data = f'{noisy_signal[i]:.5g}'
             data = str(formatted_data)+'\n'
             self.send_data(data)
@@ -68,7 +68,7 @@ class Channel:
 
     def read_signal(self):
         signal = []
-        for i in range(tf.f_sampling * 4):
+        for i in range(tf.sig_samples):
             data = self.read_data()
             if data is not None:
                 signal.append(data)
