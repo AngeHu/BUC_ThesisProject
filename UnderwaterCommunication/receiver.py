@@ -166,16 +166,17 @@ class Receiver:
             mean_peaks = np.zeros(4)
             # slot 1
             peaks_slot1 = peaks[np.where(peaks < tf.chirp_samples)]
-            mean_peaks[0] = mean(t_frame, peaks_slot1)
+            print(t_frame[peaks_slot1], file=sys.stderr)
+            mean_peaks[0] = mean(amplitude_envelope, peaks_slot1)
             # slot 2
             peaks_slot2 = peaks[np.where((peaks >= tf.chirp_samples) & (peaks < 2*tf.chirp_samples))]
-            mean_peaks[1] = mean(t_frame, peaks_slot2)
+            mean_peaks[1] = mean(amplitude_envelope, peaks_slot2)
             # slot 3
             peaks_slot3 = peaks[np.where((peaks >= 2*tf.chirp_samples) & (peaks < 3*tf.chirp_samples))]
-            mean_peaks[2] = mean(t_frame, peaks_slot3)
+            mean_peaks[2] = mean(amplitude_envelope, peaks_slot3)
             # slot 4
             peaks_slot4 = peaks[np.where(peaks >= 3*tf.chirp_samples)]
-            mean_peaks[3] = mean(t_frame, peaks_slot4)
+            mean_peaks[3] = mean(amplitude_envelope, peaks_slot4)
 
             max_peak = np.argmax(mean_peaks)
             if max_peak == 0:

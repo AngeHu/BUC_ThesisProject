@@ -15,7 +15,7 @@ if params.BER_SNR_SIMULATION: # to run the simulation set BER_SNR_SIMULATION = T
         os.makedirs(params.img_directory)
     ber = []
     i = 0
-    snr_db = np.arange(-25, 5, 1) # SNR range from -25 to 5 dB
+    snr_db = np.arange(2, 5, 1) # SNR range from -25 to 5 dB
 
     for i in range(len(snr_db)):
         print("SNR: ", snr_db[i])
