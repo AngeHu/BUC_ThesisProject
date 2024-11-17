@@ -21,7 +21,7 @@ METHOD = 1 if tf.MAX_PEAK else 2 if tf.MEAN_PEAK else 3 if tf.SLOT_PEAK else 0
 plt.rcParams['agg.path.chunksize'] = 10000
 
 t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples) # vettore tempo
-t_frame = np.linspace(0, tf.T_frame, tf.samples) # vettore tempo
+t_frame = np.linspace(0, tf.T_frame, tf.sig_samples) # vettore tempo
 chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
 
 def mean(x, indices):
@@ -66,7 +66,7 @@ class Receiver:
         print("Plotting correlation")
         global chirp_signal
         self.correlation = correlate(signal, chirp_signal, mode='full')
-        lags = np.arange(-len(signal) + 1, len(chirp_signal)) / (tf.samples)
+        lags = np.arange(-len(signal) + 1, len(chirp_signal)) / (tf.sig_samples)
         # lags = np.arange(0, len(signal))
         plt.figure()
         plt.plot(lags, self.correlation)
@@ -78,9 +78,9 @@ class Receiver:
     def plot_spectrogram(self, signal: np.array):
         print("Plotting spectrogram")
         print("Signal length: ", len(signal))
-        f, t, Sxx = spectrogram(signal, fs=tf.samples, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
+        f, t, Sxx = spectrogram(signal, fs=tf.sig_samples, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
                                 nfft=2048)
-        # f, t, Sxx = stft(signal, fs=tf.samples, nperseg=256)
+        # f, t, Sxx = stft(signal, fs=tf.sig_samples, nperseg=256)
         # Sxx_magnitude = np.abs(Sxx)
         # plt.pcolormesh(t, f, Sxx_magnitude)
         # plt.ylabel('Frequency [Hz]')
@@ -96,7 +96,7 @@ class Receiver:
         plt.show()
 
     # decode signal
-    def lowpass_filter(self, data, fs=tf.chirp_samples, lowcut=tf.f_max, order=8):
+    def lowpass_filter(self, data, fs=tf.f_sampling, lowcut=tf.f_max, order=8):
         b, a = butter(order, lowcut, fs=fs, btype='low')
 
         filtered_data = lfilter(b, a, data)
@@ -226,7 +226,7 @@ if __name__ == "__main__":
                 data = np.append(data, float_data)
                 rc.decode_signal(float_data)
 
-                if len(data) >= 4 * tf.T_frame * tf.samples and not tf.BER_SNR_SIMULATION:
+                if len(data) >= 4 * tf.T_frame * tf.sig_samples and not tf.BER_SNR_SIMULATION:
                     # plot data
                     #rc.plot_data(data)
 
@@ -238,7 +238,8 @@ if __name__ == "__main__":
                     #time.sleep(5)
                     data = np.array([])
                 i += 1
-
+    except Exception as e:
+        print("Error: ", e, file=sys.stderr)
     finally:
         print(rc.deciphered_data)
         rc.channel.close()

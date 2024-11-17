@@ -5,6 +5,8 @@ import re # regular expression
 import matplotlib.pyplot as plt
 import os
 
+# communicate takes too much time
+
 
 if params.BER_SNR_SIMULATION: # to run the simulation set BER_SNR_SIMULATION = True in params.py
     if not os.path.exists("./img"):
