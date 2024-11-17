@@ -193,8 +193,11 @@ class Receiver:
             # slot 4
             peaks_slot4 = peaks[np.where(peaks >= 3*tf.chirp_samples)]
             mean_peaks[3] = mean(t_frame, peaks_slot4)
+            print("Mean peaks: ", mean_peaks)
+
 
             max_peak = np.argmax(mean_peaks)
+            print("Max peak: ", max_peak)
             if max_peak == 0:
                 self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse1.data)
             elif max_peak == 1:
