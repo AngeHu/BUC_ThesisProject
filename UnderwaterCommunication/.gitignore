@@ -17,3 +17,6 @@ __pycache__/
 
 # ignore .gitignore file
 .gitignore
+
+receiver_profile.prof
+transmitter_profile.prof
