@@ -51,14 +51,20 @@ class Channel:
 
     def send_signal(self, signal, noise_level):
         noisy_signal = self.add_noise(signal, noise_level)
-        for i in range(tf.sig_samples):
+        for i in range(len(signal)):
             formatted_data = f'{noisy_signal[i]:.5g}'
             data = str(formatted_data)+'\n'
             self.send_data(data)
 
     def read_data(self):
         try:
-            data = self.fifo.readline().strip()
+            data = self.fifo.readline()
+            if data == 'EOF':
+                print("End of communication", file=sys.stderr)
+                self.fifo.close()
+                return None
+            else:
+                data.strip()
             return float(data)
         except BrokenPipeError:
             if not tf.BER_SNR_SIMULATION: print("BrokenPipeError: The transmitter has closed the pipe.")
@@ -71,6 +77,8 @@ class Channel:
             data = self.read_data()
             if data is not None:
                 signal.append(data)
+            else:
+                return None
         return signal
 
     def close(self):

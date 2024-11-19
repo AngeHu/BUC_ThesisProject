@@ -106,7 +106,9 @@ if __name__ == "__main__":
             frq = np.array([])
             sig = np.array([])
 
-    time.sleep(10) # wait for receiver to finish
+    # end of communication
+    transmitter.channel.send_data("EOF")
+    time.sleep(2) # wait for receiver to finish
 
     transmitter.channel.close()
 

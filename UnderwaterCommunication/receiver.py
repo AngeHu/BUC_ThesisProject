@@ -55,6 +55,8 @@ class Receiver:
 
     def read(self):
         data = self.channel.read_signal()
+        if data is None:
+            return None
         return data
 
     def plot_data(self, data):
@@ -166,7 +168,6 @@ class Receiver:
             mean_peaks = np.zeros(4)
             # slot 1
             peaks_slot1 = peaks[np.where(peaks < tf.chirp_samples)]
-            print(t_frame[peaks_slot1], file=sys.stderr)
             mean_peaks[0] = mean(amplitude_envelope, peaks_slot1)
             # slot 2
             peaks_slot2 = peaks[np.where((peaks >= tf.chirp_samples) & (peaks < 2*tf.chirp_samples))]
@@ -198,6 +199,7 @@ class Receiver:
         # plot correlation
 
         # disable plotting for BER/SNR simulation
+        '''
         plt.figure()
         plt.plot(t_frame, amplitude_envelope)
         plt.plot(t_frame[peaks], amplitude_envelope[peaks], "x", color="red")
@@ -211,6 +213,7 @@ class Receiver:
             plt.savefig(img_directory + timestamp + ".png")
         else:
             plt.show()
+        '''
 
 
 
@@ -222,7 +225,7 @@ if __name__ == "__main__":
     try:
         while True:
             data_str = rc.read()
-            if data_str:
+            if data_str is not None:
                 float_data = [float(i) for i in data_str]
                 data = np.append(data, float_data)
                 rc.decode_signal(float_data)
@@ -239,6 +242,8 @@ if __name__ == "__main__":
                     #time.sleep(5)
                     data = np.array([])
                 i += 1
+            else:
+                break
     except Exception as e:
         print("Error: ", e, file=sys.stderr)
     finally:
