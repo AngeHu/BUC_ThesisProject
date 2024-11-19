@@ -3,7 +3,7 @@ import subprocess
 
 # Press the green button in the gutter to run the script.
 def run_script(script_name):
-    subprocess.run(["python", script_name])
+    subprocess.run(["python3", script_name])
 
 if __name__ == '__main__':
 

@@ -14,7 +14,7 @@ SLOT_PEAK = True
 num_bits = 8  # Number of bits to transmit
 img_directory = "./img/slot_peak/"  # directory
 
-T_frame = 1 # periodo totale del segnale - 1 sec
+T_frame = 0.1 # periodo totale del segnale - 1 sec
 f_min = 18000 # frequenza minima
 f_max = 38000 # frequenza massima
 f_sampling = 96000 # frequenza campionamento

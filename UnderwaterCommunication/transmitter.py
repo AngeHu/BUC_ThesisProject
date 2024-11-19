@@ -123,8 +123,9 @@ if __name__ == "__main__":
             if not tf.BER_SNR_SIMULATION: plot_function(np.linspace(0, 4 * tf.T_frame, 4 * 4 * tf.chirp_samples), frq, sig)
             frq = np.array([])
             sig = np.array([])
+    transmitter.channel.send_data("EOF")
 
-    time.sleep(10) # wait for receiver to finish
+    time.sleep(2) # wait for receiver to finish
 
     transmitter.channel.close()
 

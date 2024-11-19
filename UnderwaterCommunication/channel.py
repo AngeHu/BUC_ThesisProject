@@ -59,7 +59,12 @@ class Channel:
 
     def read_data(self):
         try:
-            data = self.fifo.readline().strip()
+            data = self.fifo.readline()
+            if data == 'EOF':
+                self.fifo.close()
+                return None
+            else:
+                data.strip()
             return float(data)
         except BrokenPipeError:
             if not tf.BER_SNR_SIMULATION: print("BrokenPipeError: The transmitter has closed the pipe.")
