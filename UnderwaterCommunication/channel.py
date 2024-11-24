@@ -52,9 +52,8 @@ class Channel:
     def send_signal(self, signal, noise_level):
         noisy_signal = self.add_noise(signal, noise_level)
         for i in range(len(signal)):
-            formatted_data = f'{noisy_signal[i]:.5g}'
-            data = str(formatted_data)+'\n'
-            self.send_data(data)
+            formatted_data = f'{noisy_signal[i]:.5g}'+ '\n'
+            self.send_data(formatted_data)
 
     def read_data(self):
         try:
@@ -70,8 +69,9 @@ class Channel:
             if not tf.BER_SNR_SIMULATION: print("BrokenPipeError: The transmitter has closed the pipe.")
             self.fifo.close()
             return None
-
+    '''
     def read_signal(self):
+        
         signal = []
         for i in range(tf.sig_samples):
             data = self.read_data()
@@ -80,6 +80,38 @@ class Channel:
             else:
                 return None
         return signal
+    
+    '''
+
+    def read_signal(self):
+        signal = []
+        try:
+            # Read 10 lines at a time until we get `tf.sig_samples` samples or EOF
+            while len(signal) < tf.sig_samples:
+                # Read up to 10 lines
+                lines = [self.fifo.readline().strip() for _ in range(10)]
+
+                for line in lines:
+                    if line == 'EOF':  # Handle EOF
+                        print("End of communication", file=sys.stderr)
+                        self.fifo.close()
+                        return signal  # Return what we have so far
+                    if line:  # Skip empty lines
+                        try:
+                            signal.append(float(line))
+                        except ValueError:
+                            print(f"Invalid data format: {line}", file=sys.stderr)
+
+                # Stop reading if we've already collected enough samples
+                if len(signal) >= tf.sig_samples:
+                    break
+
+            return signal[:tf.sig_samples]  # Return exactly `tf.sig_samples` values
+
+        except BrokenPipeError:
+            print("BrokenPipeError: The transmitter has closed the pipe.", file=sys.stderr)
+            self.fifo.close()
+            return None
 
     def close(self):
         self.fifo.close()

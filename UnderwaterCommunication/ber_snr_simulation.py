@@ -1,66 +1,80 @@
 import subprocess
 import params
 import numpy as np
-import re # regular expression
+import re  # regular expression
 import matplotlib.pyplot as plt
 import os
 
 # communicate takes too much time
 
 
-if params.BER_SNR_SIMULATION: # to run the simulation set BER_SNR_SIMULATION = True in params.py
+if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = True in params.py
     if not os.path.exists("./img"):
         os.makedirs("./img")
     if not os.path.exists(params.img_directory):
         os.makedirs(params.img_directory)
-    ber = []
     i = 0
-    snr_db = np.arange(-20, 20, 1) # SNR range from -25 to 5 dB
+    snr_db = np.arange(-30, 10, 1)  # SNR range from -25 to 5 dB
 
-    for i in range(len(snr_db)):
-        print("SNR: ", snr_db[i])
-        print("start transmission")
-        process1 = subprocess.Popen(['python3', './transmitter.py', str(snr_db[i])], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        print("start reception")
-        process2 = subprocess.Popen(['python3', './receiver.py'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    method = [1, 2, 3]  # Max peak, Mean peak, Slot peak
 
-        print("wait for transmission to finish")
-        # Capture output and errors
-        output1, error1 = process1.communicate()
-        output2, error2 = process2.communicate()
+    # matrix of bit error rate
+    ber = [[] for _ in method]
+    for m in range(len(method)):
+        print("Method: ", method[m])
+        for i in range(len(snr_db)):
+            print("SNR: ", snr_db[i])
+            print("start transmission")
+            process1 = subprocess.Popen(['python3', './transmitter.py', str(snr_db[i])],
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE,
+                                        text=True)
+            print("start reception")
+            process2 = subprocess.Popen(['python3', './receiver.py', str(method[m])],
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE,
+                                        text=True)
 
-        # Print output and errors
-        print(output1)
-        print("transmitter:", error1)
-        print(output2)
-        print("receiver:", error2)
+            print("wait for transmission to finish")
+            # Capture output and errors
+            output1, error1 = process1.communicate()
+            output2, error2 = process2.communicate()
 
-        # todo: implement plot of ber/snr graph
-        # compare output1 and output2 to check if the transmission was successful
+            # Print output and errors
+            print(output1)
+            print("transmitter:", error1)
+            print(output2)
+            print("receiver:", error2)
 
-        # extract numbers from the output
-        output1_list = re.findall(r'-?\d\.?\d*', output1)
-        output2_list = re.findall(r'-?\d\.?\d*', output2)
-        output1 = [float(i) for i in output1_list]
-        output2 = [float(i) for i in output2_list]
-        '''
-        print("Output1: ", output1)
-        print("Output2: ", output2)
-        '''
-        # compare the two outputs
-        error_count = 0
-        for n in range(len(output1)):
-            if output1[n] != output2[n]:
-                error_count += 1
+            # todo: implement plot of ber/snr graph
+            # compare output1 and output2 to check if the transmission was successful
 
-        # append the ber to the list, if ber > 0.5, set it to 0.5
-        ber.append(error_count / params.num_bits if error_count / params.num_bits < 0.5 else 0.5)
+            # extract numbers from the output
+            output1_list = re.findall(r'-?\d\.?\d*', output1)
+            output2_list = re.findall(r'-?\d\.?\d*', output2)
+            output1 = [float(i) for i in output1_list]
+            output2 = [float(i) for i in output2_list]
+            '''
+            print("Output1: ", output1)
+            print("Output2: ", output2)
+            '''
+            # compare the two outputs
+            error_count = 0
+            for n in range(len(output1)):
+                if output1[n] != output2[n]:
+                    error_count += 1
 
-    print("BER: ", ber)
+            # append the ber to the list, if ber > 0.5, set it to 0.5
+            ber[m].append(error_count / params.num_bits if error_count / params.num_bits < 0.5 else 0.5)
+
+        print("BER: ", ber[m])
 
     # plot ber/snr graph
     plt.figure()
-    plt.plot(snr_db, ber)
+    plt.plot(snr_db, ber[0], label="Max Peak", color='red')
+    plt.plot(snr_db, ber[1], label="Mean Peak", color='blue')
+    plt.plot(snr_db, ber[2], label="Slot Peak", color='green')
+    plt.legend()
     plt.yscale('log')
     plt.ylim(None, 0.5)
     plt.xlabel("SNR [dB]")

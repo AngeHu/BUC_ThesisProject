@@ -15,7 +15,7 @@ import sys
 
 SAVE_IMG = tf.SAVE_IMG
 img_directory = tf.img_directory
-METHOD = 1 if tf.MAX_PEAK else 2 if tf.MEAN_PEAK else 3 if tf.SLOT_PEAK else 0
+
 
 # increase agg.path.chunksize
 plt.rcParams['agg.path.chunksize'] = 10000
@@ -80,7 +80,12 @@ class Receiver:
     def plot_spectrogram(self, signal: np.array):
         print("Plotting spectrogram")
         print("Signal length: ", len(signal))
-        f, t, Sxx = spectrogram(signal, fs=tf.sig_samples, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
+        nperseg = min(2048, len(signal))
+        f, t, Sxx = spectrogram(signal,
+                                fs=tf.sig_samples,
+                                window='hamming',
+                                nperseg=nperseg,
+                                noverlap=2048 * 0.25,
                                 nfft=2048)
         # f, t, Sxx = stft(signal, fs=tf.sig_samples, nperseg=256)
         # Sxx_magnitude = np.abs(Sxx)
@@ -104,20 +109,24 @@ class Receiver:
         filtered_data = lfilter(b, a, data)
         return filtered_data
 
-    def decode_signal(self, signal):
+    def decode_signal(self, signal, method, sigma=2):
+        if signal == []:
+            print("Empty signal", file=sys.stderr)
+            return None
         filtered_signal = self.lowpass_filter(signal)
         correlated_signal = correlate(filtered_signal, chirp_signal, mode='same')
         analytic_signal = hilbert(correlated_signal)
         amplitude_envelope = np.abs(analytic_signal)
+        mean_corr = np.mean(amplitude_envelope)
+        corr_std = np.std(amplitude_envelope)
+        threshold = mean_corr + sigma * corr_std # 3 sigma
+        peaks, _ = find_peaks(amplitude_envelope, height=threshold)
 
-        if METHOD == 2:
+        if method == 2:
+            # print("Mean peak", file=sys.stderr)
             # media dei picchi per trovare il picco più probabile
 
             # search for chirp based on mean and std
-            mean_corr = np.mean(amplitude_envelope)
-            corr_std = np.std(amplitude_envelope)
-            threshold = mean_corr + 3 * corr_std # 3 sigma
-            peaks, _ = find_peaks(amplitude_envelope, height=threshold)
             mean_peak = np.mean(t_frame[peaks])
 
             # search for chirp based on peak density
@@ -143,7 +152,8 @@ class Receiver:
                 print("No valid peak found", file=sys.stderr)
 
         # cerca picco massimo
-        elif METHOD == 1:
+        elif method == 1:
+            # print("Max peak", file=sys.stderr)
             max_peak_index = np.argmax(amplitude_envelope)
             if max_peak_index < self.tm.lapse1.end*tf.chirp_samples and max_peak_index > self.tm.lapse1.start*tf.chirp_samples:
                 self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse1.data)
@@ -157,13 +167,9 @@ class Receiver:
                 # print on stderr
                 print("No valid peak found", file=sys.stderr)
 
-        elif METHOD == 3:
+        elif method == 3:
+            # print("Slot peak", file=sys.stderr)
             # media dei picchi per trovare il picco più probabile in base a time slot
-
-            mean_corr = np.mean(amplitude_envelope)
-            corr_std = np.std(amplitude_envelope)
-            threshold = mean_corr + 3 * corr_std
-            peaks, _ = find_peaks(amplitude_envelope, height=threshold)
 
             mean_peaks = np.zeros(4)
             # slot 1
@@ -192,7 +198,7 @@ class Receiver:
                 # print on stderr
                 print("No valid peak found", file=sys.stderr)
 
-        elif METHOD == 0:
+        elif method == 0:
             print("No method selected", file=sys.stderr)
             exit(1)
 
@@ -218,17 +224,23 @@ class Receiver:
 
 
 
+
 if __name__ == "__main__":
     rc = Receiver()
     i = 0
     data = np.array([])
+    if tf.BER_SNR_SIMULATION:
+        method = int(sys.argv[1])
+    else:
+        method = 1 if tf.MAX_PEAK else 2 if tf.MEAN_PEAK else 3 if tf.SLOT_PEAK else 0
+
     try:
         while True:
             data_str = rc.read()
             if data_str is not None:
                 float_data = [float(i) for i in data_str]
                 data = np.append(data, float_data)
-                rc.decode_signal(float_data)
+                rc.decode_signal(float_data, method)
 
                 if len(data) >= 4 * tf.T_frame * tf.sig_samples and not tf.BER_SNR_SIMULATION:
                     # plot data

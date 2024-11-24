@@ -11,7 +11,7 @@ MEAN_PEAK = False
 SLOT_PEAK = True
 
 # ber/snr simulation parameters
-num_bits = 8192  # Number of bits to transmit
+num_bits = 8388608 # Number of bits to transmit
 img_directory = "./img/slot_peak/"  # directory
 
 T_frame = 0.1 # periodo totale del segnale - 1 sec
