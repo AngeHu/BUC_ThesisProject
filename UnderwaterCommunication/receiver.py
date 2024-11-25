@@ -66,7 +66,7 @@ class Receiver:
         if not tf.BER_SNR_SIMULATION: print("Receiver ON")
         self.channel.open('r')
         self.correlation = []
-        self.deciphered_data = np.array([])
+        self.deciphered_data =np.array([], dtype=np.int8)  # data to decipher
         self.tm = tf.TimeFrame()
 
 
@@ -120,6 +120,10 @@ class Receiver:
         return filtered_data
 
     def decode_signal(self, signal):
+        global chirp_signal
+        if signal == []:
+            print("Empty signal", file=sys.stderr)
+            return None
         filtered_signal = self.lowpass_filter(signal)
         correlated_signal = correlate(filtered_signal, chirp_signal, mode='same')
         analytic_signal = hilbert(correlated_signal)
@@ -137,12 +141,14 @@ class Receiver:
 
             # search for chirp based on peak density
 
+            '''
             if tf.DEBUG:
                 print("Mean correlation: ", mean_corr)
                 print("Correlation std: ", corr_std)
                 print("Threshold: ", threshold)
                 # decode signal
                 print("Mean peak: ", mean_peak)
+            '''
 
             # check in which interval the peak is
             if mean_peak < self.tm.lapse1.end*tf.t_slot and mean_peak > self.tm.lapse1.start*tf.t_slot:
@@ -217,6 +223,7 @@ class Receiver:
         # plot correlation
 
         # disable plotting for BER/SNR simulation
+        '''
         plt.figure()
         plt.plot(t_frame, amplitude_envelope)
         plt.plot(t_frame[peaks], amplitude_envelope[peaks], "x", color="red")
@@ -230,6 +237,7 @@ class Receiver:
             plt.savefig(img_directory + timestamp + ".png")
         else:
             plt.show()
+        '''
 
 
 
@@ -240,11 +248,11 @@ if __name__ == "__main__":
     data = np.array([])
     try:
         while True:
-            data_str = rc.read()
-            if data_str:
-                float_data = [float(i) for i in data_str]
-                data = np.append(data, float_data)
-                rc.decode_signal(float_data)
+            data = rc.read()
+            if data:
+                # float_data = [float(i) for i in data_str]
+                # data = np.append(data, float_data)
+                rc.decode_signal(data)
 
                 if len(data) >= 4 * tf.T_frame * tf.sig_samples and not tf.BER_SNR_SIMULATION:
                     # plot data
@@ -262,7 +270,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Receiver interrupted", file=sys.stderr)
     except Exception as e:
-        print("Error: ", e, file=sys.stderr)
+        print("Error:", e, file=sys.stderr)
     finally:
         rc.channel.close()
         print(rc.deciphered_data)

@@ -11,7 +11,7 @@ MEAN_PEAK = False
 SLOT_PEAK = True
 
 # ber/snr simulation parameters
-num_bits = 8  # Number of bits to transmit
+num_bits = 10000 # Number of bits to transmit
 img_directory = "./img/slot_peak/"  # directory
 
 T_frame = 0.1 # periodo totale del segnale - 1 sec
@@ -24,7 +24,7 @@ t_slot = T_frame/4 # periodo segnale
 t_sample = t_slot # tempo di campionamento
 
 
-SNR = 2 # rapporto segnale rumore
+SNR = 0.2 # rapporto segnale rumore
 
 class Period:
     def __init__(self, start, end, data):
