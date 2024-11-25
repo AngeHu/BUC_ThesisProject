@@ -3,7 +3,8 @@ import params as tf
 import numpy as np
 import sys
 
-fifo_path  = "/tmp/channel"
+fifo_path = "/tmp/channel"
+
 
 class Channel:
     def __delete__(self):
@@ -25,19 +26,23 @@ class Channel:
         self.fifo = None
         # permission
         self.permission = 0o600
-        if not(os.path.exists(self.channel)):
+        if not (os.path.exists(self.channel)):
             os.mkfifo(self.channel, self.permission)
             print(f"FIFO named {self.channel} is created successfully", file=sys.stderr)
         else:
             print(f"FIFO named {self.channel} already exists", file=sys.stderr)
         self.open(mode)
 
-    def add_noise(self, signal, noise_level):
+    @staticmethod
+    def add_noise(signal, noise_level):
         noise = np.random.normal(0, 1, len(signal)) * np.sqrt(noise_level)
         # power_noise calcolato prendendo un quarto del rumore e diviso per lunghezza del chirp
+        '''
         if tf.DEBUG:
-            print("Power noise (measured): ", sum(noise[0:tf.sig_samples]**2) / tf.sig_samples, file=sys.stderr) #se diviso per len(signal) da la metà
-            print("Check SNR: ", sum(signal**2) / sum(noise[0:tf.sig_samples]**2), file=sys.stderr)
+            print("Power noise (measured): ", sum(noise[0:tf.sig_samples] ** 2) / tf.sig_samples,
+                  file=sys.stderr)  # se diviso per len(signal) da la metà
+            print("Check SNR: ", sum(signal ** 2) / sum(noise[0:tf.sig_samples] ** 2), file=sys.stderr)
+        '''
         signal = signal + noise
         return signal
 
@@ -51,9 +56,13 @@ class Channel:
 
     def send_signal(self, signal, noise_level):
         noisy_signal = self.add_noise(signal, noise_level)
+        '''
         for i in range(len(signal)):
-            formatted_data = f'{noisy_signal[i]:.5g}'+ '\n'
+            formatted_data = f'{noisy_signal[i]:.5g}' + '\n'
             self.send_data(formatted_data)
+        '''
+        signal_str = '\n'.join([f'{x:.5g}' for x in noisy_signal]) + '\n'
+        self.send_data(signal_str)
 
     def read_data(self):
         try:
@@ -69,9 +78,10 @@ class Channel:
             if not tf.BER_SNR_SIMULATION: print("BrokenPipeError: The transmitter has closed the pipe.")
             self.fifo.close()
             return None
+
     '''
     def read_signal(self):
-        
+
         signal = []
         for i in range(tf.sig_samples):
             data = self.read_data()
@@ -80,10 +90,10 @@ class Channel:
             else:
                 return None
         return signal
-    
+
     '''
 
-    def read_signal(self, batch_size=100):
+    def read_signal(self, batch_size=2400): #batch no more than 400
         signal = []
         try:
             # Read 10 lines at a time until we get `tf.sig_samples` samples or EOF

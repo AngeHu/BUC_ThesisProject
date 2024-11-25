@@ -110,6 +110,7 @@ class Receiver:
         return filtered_data
 
     def decode_signal(self, signal, method, sigma=2):
+        global chirp_signal
         if signal == []:
             print("Empty signal", file=sys.stderr)
             return None
@@ -236,11 +237,9 @@ if __name__ == "__main__":
 
     try:
         while True:
-            data_str = rc.read()
-            if data_str is not None:
-                float_data = [float(i) for i in data_str]
-                data = np.append(data, float_data)
-                rc.decode_signal(float_data, method)
+            data = rc.read()
+            if data is not None:
+                rc.decode_signal(data, method)
 
                 if len(data) >= 4 * tf.T_frame * tf.sig_samples and not tf.BER_SNR_SIMULATION:
                     # plot data
