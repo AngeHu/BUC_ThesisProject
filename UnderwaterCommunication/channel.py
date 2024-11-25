@@ -83,13 +83,13 @@ class Channel:
     
     '''
 
-    def read_signal(self):
+    def read_signal(self, batch_size=100):
         signal = []
         try:
             # Read 10 lines at a time until we get `tf.sig_samples` samples or EOF
             while len(signal) < tf.sig_samples:
                 # Read up to 10 lines
-                lines = [self.fifo.readline().strip() for _ in range(10)]
+                lines = [self.fifo.readline().strip() for _ in range(batch_size)]
 
                 for line in lines:
                     if line == 'EOF':  # Handle EOF
