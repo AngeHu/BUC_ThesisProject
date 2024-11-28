@@ -2,7 +2,7 @@
 
 # debug e ber/snr simulation non possono essere contemporaneamente attivi
 DEBUG = False
-BER_SNR_SIMULATION = True
+BER_SNR_SIMULATION = False
 SAVE_IMG = False
 
 # chirp decoding - only one of the two can be active
@@ -44,3 +44,11 @@ class TimeFrame:
         self.timeInterval = [self.lapse1, self.lapse2, self.lapse3, self.lapse4]
 
         self.slot = [0, 1, 2, 3]
+
+time_interval = [
+    {"start": 0, "end": 1, "data": [0, 0]},
+    {"start": 1, "end": 2, "data": [0, 1]},
+    {"start": 2, "end": 3, "data": [1, 1]},
+    {"start": 3, "end": 4, "data": [1, 0]},
+]
+

@@ -14,7 +14,7 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
     if not os.path.exists(params.img_directory):
         os.makedirs(params.img_directory)
     i = 0
-    snr_db = np.arange(-30, 10, 1)  # SNR range from -25 to 5 dB
+    snr_db = np.arange(-35, 5, 1)  # SNR range from -25 to 5 dB
 
     method = [1, 2, 3]  # Max peak, Mean peak, Slot peak
 
@@ -38,6 +38,7 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
             print("wait for transmission to finish")
             # Capture output and errors
             output1, error1 = process1.communicate()
+            print("wait for reception to finish")
             output2, error2 = process2.communicate()
 
             # Print output and errors
@@ -46,7 +47,6 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
             print(output2)
             print("receiver:", error2)
 
-            # todo: implement plot of ber/snr graph
             # compare output1 and output2 to check if the transmission was successful
 
             # extract numbers from the output
