@@ -65,8 +65,8 @@ def encode_signal(data):
 
 class Transmitter():
     def __init__(self):
-        self.channel = channel.Channel('w')
-        if not tf.BER_SNR_SIMULATION: ("Transmitter ON")
+        self.channel = channel.Channel("wb")
+        if not tf.BER_SNR_SIMULATION: print("Transmitter ON")
         self.x = np.linspace(0, tf.T_frame, tf.sig_samples)
         self.slot = np.linspace(0, tf.t_slot, tf.chirp_samples)
         self.signal = []
@@ -134,7 +134,7 @@ if __name__ == "__main__":
             sig = np.array([])
         '''
 
-    transmitter.channel.send_data("EOF")
+    # transmitter.channel.send_data("EOF")
 
     time.sleep(1) # wait for receiver to finish
 

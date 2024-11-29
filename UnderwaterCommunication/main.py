@@ -1,6 +1,6 @@
 import threading
 import subprocess
-
+import multiprocessing
 # Press the green button in the gutter to run the script.
 def run_script(script_name):
     subprocess.run(["python3", script_name])
@@ -11,14 +11,17 @@ if __name__ == '__main__':
 
 
     if __name__ == "__main__":
-        script1_thread = threading.Thread(target=run_script, args=("./transmitter.py",))
-        script2_thread = threading.Thread(target=run_script, args=("./receiver.py",))
+        #transmitter = multiprocessing.Process(target=run_script, args=("./transmitter.py",))
+        #receiver = multiprocessing.Process(target=run_script, args=("./receiver.py",))
 
-        script1_thread.start()
-        script2_thread.start()
+        transmitter = threading.Thread(target=run_script, args=("./transmitter.py",))
+        receiver = threading.Thread(target=run_script, args=("./receiver.py",))
 
-        script1_thread.join()
-        script2_thread.join()
+        transmitter.start()
+        receiver.start()
+
+        transmitter.join()
+        receiver.join()
 
         print("Both scripts have finished executing.")
 

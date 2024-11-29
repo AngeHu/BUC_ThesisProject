@@ -12,6 +12,7 @@ from scipy.signal import chirp, spectrogram, correlate, stft, hilbert
 from scipy.fft import fftshift
 from scipy.signal import butter, lfilter, find_peaks
 import sys
+import multiprocessing
 
 if tf.DEBUG:
     import cProfile
@@ -62,11 +63,12 @@ def plot_function(x, y_sig):
 
 class Receiver:
     def __init__(self):
-        self.channel = channel.Channel('r')
+        self.channel = channel.Channel("rb")
         if not tf.BER_SNR_SIMULATION: print("Receiver ON")
-        self.channel.open('r')
         self.correlation = []
-        self.deciphered_data =np.array([], dtype=np.int8)  # data to decipher
+        self.mean_peak_decoded =np.array([], dtype=np.int8)  # data to decipher
+        self.max_peak_decoded = np.array([], dtype=np.int8)  # data to decipher
+        self.slot_peak_decoded = np.array([], dtype=np.int8)
         self.tm = tf.TimeFrame()
 
 
@@ -121,104 +123,58 @@ class Receiver:
 
     def decode_signal(self, signal):
         global chirp_signal
-        if signal == []:
+
+        if not signal:
             print("Empty signal", file=sys.stderr)
             return None
+
+        # filter and correlate signal
         filtered_signal = self.lowpass_filter(signal)
         correlated_signal = correlate(filtered_signal, chirp_signal, mode='same')
-        analytic_signal = hilbert(correlated_signal)
-        amplitude_envelope = np.abs(analytic_signal)
 
-        if METHOD == 2:
-            # media dei picchi per trovare il picco più probabile
+        # extract analytic signal and envelope
+        amplitude_envelope = np.abs(hilbert(correlated_signal))
 
-            # search for chirp based on mean and std
-            mean_corr = np.mean(amplitude_envelope)
-            corr_std = np.std(amplitude_envelope)
-            threshold = mean_corr + 3 * corr_std # 3 sigma
-            peaks, _ = find_peaks(amplitude_envelope, height=threshold)
-            mean_peak = np.mean(t_frame[peaks])
+        # thresholding
+        mean_corr = np.mean(amplitude_envelope)
+        corr_std = np.std(amplitude_envelope)
+        threshold = mean_corr + 3 * corr_std # 3 sigma
+        peaks, _ = find_peaks(amplitude_envelope, height=threshold)
 
-            # search for chirp based on peak density
+        if peaks.size == 0:
+            print("No peaks found", file=sys.stderr)
 
-            '''
-            if tf.DEBUG:
-                print("Mean correlation: ", mean_corr)
-                print("Correlation std: ", corr_std)
-                print("Threshold: ", threshold)
-                # decode signal
-                print("Mean peak: ", mean_peak)
-            '''
+        # media totale dei picchi
 
-            # check in which interval the peak is
-            if mean_peak < self.tm.lapse1.end*tf.t_slot and mean_peak > self.tm.lapse1.start*tf.t_slot:
-                self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse1.data)
-            elif mean_peak < self.tm.lapse2.end*tf.t_slot and mean_peak > self.tm.lapse2.start*tf.t_slot:
-                self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse2.data)
-            elif mean_peak < self.tm.lapse3.end*tf.t_slot and mean_peak > self.tm.lapse3.start*tf.t_slot:
-                self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse3.data)
-            elif mean_peak < self.tm.lapse4.end*tf.t_slot and mean_peak > self.tm.lapse4.start*tf.t_slot:
-                self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse4.data)
-            else:
-                # print on stderr
-                print("No valid peak found", file=sys.stderr)
+        mean_peak = np.mean(t_frame[peaks])
+        if mean_peak is None:
+            print("No mean peak", file=sys.stderr)
+            return
+        # check in which interval the peak is
+        for lapse in self.tm.timeInterval:
+            if lapse.start * tf.t_slot <= mean_peak <= lapse.end * tf.t_slot:
+                self.mean_peak_decoded = np.append(self.mean_peak_decoded, lapse.data)
 
         # cerca picco massimo
-        elif METHOD == 1:
-            max_peak_index = np.argmax(amplitude_envelope)
-            if max_peak_index < self.tm.lapse1.end*tf.chirp_samples and max_peak_index > self.tm.lapse1.start*tf.chirp_samples:
-                self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse1.data)
-            elif max_peak_index < self.tm.lapse2.end*tf.chirp_samples and max_peak_index > self.tm.lapse2.start*tf.chirp_samples:
-                self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse2.data)
-            elif max_peak_index < self.tm.lapse3.end*tf.chirp_samples and max_peak_index > self.tm.lapse3.start*tf.chirp_samples:
-                self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse3.data)
-            elif max_peak_index < self.tm.lapse4.end*tf.chirp_samples and max_peak_index > self.tm.lapse4.start*tf.chirp_samples:
-                self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse4.data)
-            else:
-                # print on stderr
-                print("No valid peak found", file=sys.stderr)
+        max_peak_index = np.argmax(amplitude_envelope)
+        if max_peak_index is None:
+            print("No max index peaks found", file=sys.stderr)
+            return
+        for lapse in self.tm.timeInterval:
+            if lapse.start * tf.chirp_samples <= max_peak_index <= lapse.end * tf.chirp_samples:
+                self.max_peak_decoded = np.append(self.max_peak_decoded, lapse.data)
 
-        elif METHOD == 3:
-            # media dei picchi per trovare il picco più probabile in base a time slot
+        # media dei picchi per slot per trovare il picco più probabile
+        mean_peaks = np.zeros(4)
+        for i in range(4):
+            peaks_slot = peaks[np.where((peaks >= i * tf.chirp_samples) & (peaks < (i + 1) * tf.chirp_samples))]
+            mean_peaks[i] = mean(amplitude_envelope, peaks_slot)
 
-            mean_corr = np.mean(amplitude_envelope)
-            corr_std = np.std(amplitude_envelope)
-            threshold = mean_corr + 3 * corr_std
-            peaks, _ = find_peaks(amplitude_envelope, height=threshold)
-
-            mean_peaks = np.zeros(4)
-            # slot 1
-            peaks_slot1 = peaks[np.where(peaks < tf.chirp_samples)]
-            mean_peaks[0] = mean(amplitude_envelope, peaks_slot1)
-            # slot 2
-            peaks_slot2 = peaks[np.where((peaks >= tf.chirp_samples) & (peaks < 2*tf.chirp_samples))]
-            mean_peaks[1] = mean(amplitude_envelope, peaks_slot2)
-            # slot 3
-            peaks_slot3 = peaks[np.where((peaks >= 2*tf.chirp_samples) & (peaks < 3*tf.chirp_samples))]
-            mean_peaks[2] = mean(amplitude_envelope, peaks_slot3)
-            # slot 4
-            peaks_slot4 = peaks[np.where(peaks >= 3*tf.chirp_samples)]
-            mean_peaks[3] = mean(amplitude_envelope, peaks_slot4)
-            print("Mean peaks: ", mean_peaks)
-
-
-            max_peak = np.argmax(mean_peaks)
-            print("Max peak: ", max_peak)
-            if max_peak == 0:
-                self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse1.data)
-            elif max_peak == 1:
-                self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse2.data)
-            elif max_peak == 2:
-                self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse3.data)
-            elif max_peak == 3:
-                self.deciphered_data = np.append(self.deciphered_data, self.tm.lapse4.data)
-            else:
-                # print on stderr
-                print("No valid peak found", file=sys.stderr)
-
-        elif METHOD == 0:
-            print("No method selected", file=sys.stderr)
-            exit(1)
+        max_peak = np.argmax(mean_peaks)
+        if max_peak is None:
+            print("No peaks found", file=sys.stderr)
+            return
+        self.slot_peak_decoded = np.append(self.slot_peak_decoded, self.tm.timeInterval[max_peak].data)
 
         # plot correlation
 
@@ -238,7 +194,6 @@ class Receiver:
         else:
             plt.show()
         '''
-
 
 
 
@@ -273,7 +228,9 @@ if __name__ == "__main__":
         print("Error:", e, file=sys.stderr)
     finally:
         rc.channel.close()
-        print(rc.deciphered_data)
+        print(rc.slot_peak_decoded)
+        print(rc.mean_peak_decoded)
+        print(rc.max_peak_decoded)
         if not tf.BER_SNR_SIMULATION:
             print("Receiver OFF")
         exit(0)
