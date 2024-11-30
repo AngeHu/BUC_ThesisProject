@@ -2,6 +2,7 @@ import os
 import params as tf
 import numpy as np
 import sys
+import struct
 
 fifo_path = "/tmp/channel"
 
@@ -13,7 +14,7 @@ class Channel:
             print(f"Channel named {fifo_path} is deleted successfully", file=sys.stderr)
 
     def open(self, mode):
-        if mode == 'r' or mode == 'w':
+        if mode == 'rb' or mode == 'wb':
             self.fifo = open(self.channel, mode)
         else:
             print("Mode not valid", file=sys.stderr)
@@ -56,13 +57,9 @@ class Channel:
 
     def send_signal(self, signal, noise_level):
         noisy_signal = self.add_noise(signal, noise_level)
-        '''
-        for i in range(len(signal)):
-            formatted_data = f'{noisy_signal[i]:.5g}' + '\n'
-            self.send_data(formatted_data)
-        '''
-        signal_str = '\n'.join([f'{x:.5g}' for x in noisy_signal]) + '\n'
-        self.send_data(signal_str)
+        # signal_str = '\n'.join([f'{x:.5g}' for x in noisy_signal]) + '\n'
+        signal_bin = struct.pack(f'{len(noisy_signal)}f', *noisy_signal)
+        self.send_data(signal_bin)
 
     def read_data(self):
         try:
@@ -99,19 +96,14 @@ class Channel:
             # Read 10 lines at a time until we get `tf.sig_samples` samples or EOF
             while len(signal) < tf.sig_samples:
                 # Read up to 10 lines
-                lines = [self.fifo.readline().strip() for _ in range(batch_size)]
-
-                for line in lines:
-                    if line == 'EOF':  # Handle EOF
-                        print("End of communication", file=sys.stderr)
-                        self.fifo.close()
-                        return signal  # Return what we have so far
-                    if line:  # Skip empty lines
-                        try:
-                            signal.append(float(line))
-                        except ValueError:
-                            print(f"Invalid data format: {line}", file=sys.stderr)
-
+                # read batch of bytes - one value is 4 bytes
+                data = self.fifo.read(batch_size)
+                if not data:
+                    print("End of communication", file=sys.stderr)
+                    self.fifo.close()
+                    return signal
+                # Convert bytes to float
+                signal.extend(struct.unpack(f'{len(data) // 4}f', data))
                 # Stop reading if we've already collected enough samples
                 if len(signal) >= tf.sig_samples:
                     break

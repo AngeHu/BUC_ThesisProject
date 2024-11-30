@@ -48,7 +48,7 @@ def encode_signal(data):
 
 class Transmitter():
     def __init__(self):
-        self.channel = channel.Channel('w')
+        self.channel = channel.Channel('wb')
         if not tf.BER_SNR_SIMULATION: ("Transmitter ON")
         self.x = np.linspace(0, tf.T_frame, tf.chirp_samples*4)
         self.slot = np.linspace(0, tf.t_slot, tf.chirp_samples)
@@ -80,6 +80,7 @@ class Transmitter():
 if __name__ == "__main__":
     # generate bit sequence
     data = np.random.randint(0, 2, tf.num_bits)
+    np.save(tf.res_directory + 'data.npy', data)
     print(data)
     SNR = -20 #float(sys.argv[1])
     # turn snr to linear scale
@@ -97,9 +98,6 @@ if __name__ == "__main__":
         transmitter.send_signal(e_signal / SNR) # send signal with noise
         i += 1
 
-    time.sleep(1)
-    # end of communication
-    transmitter.channel.send_data("EOF")
     time.sleep(1) # wait for receiver to finish
     transmitter.channel.close()
 

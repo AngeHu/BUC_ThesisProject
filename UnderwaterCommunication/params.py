@@ -2,7 +2,7 @@
 
 # debug e ber/snr simulation non possono essere contemporaneamente attivi
 DEBUG = False
-BER_SNR_SIMULATION = False
+BER_SNR_SIMULATION = True
 SAVE_IMG = False
 
 # chirp decoding - only one of the two can be active
@@ -13,6 +13,7 @@ SLOT_PEAK = True
 # ber/snr simulation parameters
 num_bits = 10000 # Number of bits to transmit
 img_directory = "./img/slot_peak/"  # directory
+res_directory = "./res/"  # directory
 
 T_frame = 0.1 # periodo totale del segnale - 1 sec
 f_min = 18000 # frequenza minima
