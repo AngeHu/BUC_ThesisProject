@@ -90,7 +90,7 @@ class Channel:
 
     '''
 
-    def read_signal(self, batch_size=2400): #batch no more than 400
+    def read_signal(self, batch_size=2400*4): #batch no more than 400
         signal = []
         try:
             # Read 10 lines at a time until we get `tf.sig_samples` samples or EOF
@@ -107,8 +107,8 @@ class Channel:
                 # Stop reading if we've already collected enough samples
                 if len(signal) >= tf.sig_samples:
                     break
-
-            return signal[:tf.sig_samples]  # Return exactly `tf.sig_samples` values
+            # rounded_signal = [round(x, 6) for x in signal]
+            return signal  # Return exactly `tf.sig_samples` values
 
         except BrokenPipeError:
             print("BrokenPipeError: The transmitter has closed the pipe.", file=sys.stderr)

@@ -1,4 +1,3 @@
-import multiprocessing
 import params
 import subprocess
 import multiprocessing
@@ -8,7 +7,10 @@ import os
 import sys
 
 # communicate takes too much time
-def run_script(script):
+def run_transmitter(script, snr_db):
+    subprocess.run(['python3', script, str(snr_db)])
+
+def run_receiver(script):
     subprocess.run(['python3', script])
 
 if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = True in params.py
@@ -19,7 +21,7 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
     if not os.path.exists(params.res_directory):
         os.makedirs(params.res_directory)
     i = 0
-    snr_db = np.arange(-20, 20, 1)  # SNR range from -25 to 5 dB
+    snr_db = np.arange(-30, 10, 1)  # SNR range from -25 to 5 dB
 
     ber_mean_peak = []
     ber_max_peak = []
@@ -42,8 +44,8 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
         '''
 
         # start transmission
-        transmitter = multiprocessing.Process(target=run_script, args=('./transmitter.py',))
-        receiver = multiprocessing.Process(target=run_script, args=('./receiver.py',))
+        transmitter = multiprocessing.Process(target=run_transmitter, args=('./transmitter.py', snr_db[i]))
+        receiver = multiprocessing.Process(target=run_receiver, args=('./receiver.py',))
         transmitter.start()
         receiver.start()
         print("wait for transmission to finish")

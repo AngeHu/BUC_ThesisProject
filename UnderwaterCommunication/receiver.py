@@ -12,7 +12,6 @@ from scipy.signal import chirp, spectrogram, correlate, stft, hilbert
 from scipy.fft import fftshift
 from scipy.signal import butter, lfilter, find_peaks
 import sys
-import multiprocessing
 
 SAVE_IMG = tf.SAVE_IMG
 img_directory = tf.img_directory
@@ -63,7 +62,7 @@ class Receiver:
         return data
 
     def plot_data(self, data):
-        print("Data length: ", len(data))
+        # print("Data length: ", len(data))
         x = np.linspace(0, 4*tf.T_frame, len(data))
         plot_function(x, data)
 
@@ -122,7 +121,6 @@ class Receiver:
         # filter and correlate signal
         filtered_signal = self.lowpass_filter(signal)
         correlated_signal = correlate(filtered_signal, chirp_signal, mode='same')
-
         # extract analytic signal and envelope
         amplitude_envelope = np.abs(hilbert(correlated_signal))
 
@@ -187,6 +185,7 @@ class Receiver:
         '''
 
 
+
 if __name__ == "__main__":
     rc = Receiver()
     i = 0
@@ -200,7 +199,7 @@ if __name__ == "__main__":
     try:
         while True:
             data = rc.read()
-            if data is not None:
+            if data:
                 rc.decode_signal(data)
             else:
                 break
