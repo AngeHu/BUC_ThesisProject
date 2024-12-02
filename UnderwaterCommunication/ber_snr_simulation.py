@@ -21,7 +21,7 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
     if not os.path.exists(params.res_directory):
         os.makedirs(params.res_directory)
     i = 0
-    snr_db = np.arange(-30, 10, 1)  # SNR range from -25 to 5 dB
+    snr_db = np.arange(-30, 6, 1)  # SNR range from -25 to 5 dB
 
     ber_mean_peak = []
     ber_max_peak = []
@@ -37,10 +37,7 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
         receiver = multiprocessing.Process(target=run_receiver, args=('./receiver.py',))
         transmitter.start()
         receiver.start()
-        print("wait for transmission to finish")
         transmitter.join()
-        # Capture output and errors
-        print("wait for reception to finish")
         receiver.join()
 
         # compare the two outputs
@@ -54,6 +51,11 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
         mean_peak_decoded = np.load(params.res_directory + 'mean_peak.npy')
         max_peak_decoded = np.load(params.res_directory + 'max_peak.npy')
         slot_peak_decoded = np.load(params.res_directory + 'slot_peak.npy')
+
+        print("Original data length: ", len(original_data))
+        print("Mean peak decoded length: ", len(mean_peak_decoded))
+        print("Max peak decoded length: ", len(max_peak_decoded))
+        print("Slot peak decoded length: ", len(slot_peak_decoded))
 
         for n in range(len(original_data)):
             if original_data[n] != mean_peak_decoded[n]:
@@ -78,7 +80,8 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
     plt.ylim(None, 0.5)
     plt.xlabel("SNR [dB]")
     plt.ylabel("BER")
-    plt.title("BER vs SNR")
+    title = "BER vs SNR"+" - "+str(params.num_bits)+" bits"
+    plt.title(title)
     plt.grid(True)
     plt.tight_layout()
     #plt.show()

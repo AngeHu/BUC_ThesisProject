@@ -67,9 +67,9 @@ class Receiver:
         if not tf.BER_SNR_SIMULATION: print("Receiver ON")
         self.correlation = []
         self.tm = tf.TimeFrame()
-        self.mean_peak_decoded = np.array([], dtype=np.int8)  # data to decipher
-        self.max_peak_decoded = np.array([], dtype=np.int8)  # data to decipher
-        self.slot_peak_decoded = np.array([], dtype=np.int8)
+        self.mean_peak_decoded = []
+        self.max_peak_decoded = []
+        self.slot_peak_decoded = []
 
 
     def read(self):
@@ -160,7 +160,9 @@ class Receiver:
             # check in which interval the peak is
         for lapse in self.tm.timeInterval:
             if lapse.start * tf.t_slot <= mean_peak <= lapse.end * tf.t_slot:
-                self.mean_peak_decoded = np.append(self.mean_peak_decoded, lapse.data)
+                # self.mean_peak_decoded = np.append(self.mean_peak_decoded, lapse.data)
+                self.mean_peak_decoded.extend(lapse.data)
+                break
 
             # cerca picco massimo
         max_peak_index = np.argmax(amplitude_envelope)
@@ -168,8 +170,10 @@ class Receiver:
             print("No max index peaks found", file=sys.stderr)
             return
         for lapse in self.tm.timeInterval:
-            if lapse.start * tf.chirp_samples <= max_peak_index <= lapse.end * tf.chirp_samples:
-                self.max_peak_decoded = np.append(self.max_peak_decoded, lapse.data)
+            if lapse.start * tf.chirp_samples <= max_peak_index < lapse.end * tf.chirp_samples:
+                # self.max_peak_decoded = np.append(self.max_peak_decoded, lapse.data)
+                self.max_peak_decoded.extend(lapse.data)
+                break
 
         # media dei picchi per slot per trovare il picco più probabile
         mean_peaks = np.zeros(4)
@@ -181,7 +185,8 @@ class Receiver:
         if max_peak is None:
             print("No peaks found", file=sys.stderr)
             return
-        self.slot_peak_decoded = np.append(self.slot_peak_decoded, self.tm.timeInterval[max_peak].data)
+        # self.slot_peak_decoded = np.append(self.slot_peak_decoded, self.tm.timeInterval[max_peak].data)
+        self.slot_peak_decoded.extend(self.tm.timeInterval[max_peak].data)
 
         # plot correlation
         # disable plotting for BER/SNR simulation

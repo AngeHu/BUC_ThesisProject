@@ -70,8 +70,9 @@ class Transmitter():
         if not tf.BER_SNR_SIMULATION: ("Transmitter ON")
         self.x = np.linspace(0, tf.T_frame, tf.chirp_samples*4)
         self.slot = np.linspace(0, tf.t_slot, tf.chirp_samples)
-        self.signal = []
-        self.frequency = []
+        self.tm = tf.TimeFrame()
+        self.signal = np.array([])
+        self.frequency = np.array([])
 
 
     # must visualize 2 graphs: one for frequency and one for signal
@@ -103,13 +104,12 @@ if __name__ == "__main__":
     SNR = 10 ** (SNR / 10)
 
     transmitter = Transmitter()
-    tm = tf.TimeFrame()
     i = 0
     data = encode_signal(data)
     noise = e_signal / SNR
 
     while i < len(data):
-        transmitter.generate_signal(tm.timeInterval[data[i]])
+        transmitter.generate_signal(transmitter.tm.timeInterval[data[i]])
         transmitter.send_signal(noise) # send signal with noise
         i += 1
         print("msg ", i, " sent", file=sys.stderr)
