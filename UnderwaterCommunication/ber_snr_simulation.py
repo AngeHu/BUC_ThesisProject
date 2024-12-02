@@ -31,17 +31,6 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
     for i in range(len(snr_db)):
         print("SNR: ", snr_db[i])
         print("start transmission")
-        '''
-        process1 = subprocess.Popen(['python3', './transmitter.py', str(snr_db[i])],
-                                    #stdout=subprocess.PIPE,
-                                    #stderr=subprocess.PIPE,
-                                    text=True)
-        print("start reception")
-        process2 = subprocess.Popen(['python3', './receiver.py'],
-                                    #stdout=subprocess.PIPE,
-                                    #stderr=subprocess.PIPE,
-                                    text=True)
-        '''
 
         # start transmission
         transmitter = multiprocessing.Process(target=run_transmitter, args=('./transmitter.py', snr_db[i]))
@@ -54,37 +43,6 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
         print("wait for reception to finish")
         receiver.join()
 
-        '''
-        # Print output and errors
-        print(output1)
-        print("transmitter:", error1)
-        print(output2)
-        print("receiver:", error2)
-
-        # compare output1 and output2 to check if the transmission was successful
-
-        # extract numbers from the output
-        output1_list = re.findall(r'-?\d\.?\d*', output1)
-        original_data = [float(i) for i in output1_list]
-
-        lines = output2.split("\n")  # Splits by newline
-        print(lines)
-
-        for i in range(len(lines)):
-            lines[i] = re.findall(r'-?\d\.?\d*', lines[i])
-            lines[i] = [float(j) for j in lines[i]]
-            print(lines[i], len(lines[i]))
-        
-        
-        # Ensure there are at least three lines of output
-        if len(lines) >= 3:
-            mean_peak = lines[0]  # First string (Mean peak decoded)
-            max_peak = lines[1]  # Second string (Max peak decoded)
-            slot_peak = lines[2]  # Third string (Slot peak decoded)
-        else:
-            print("Error: Receiver output does not have 3 lines.", file=sys.stderr)
-            mean_peak = max_peak = slot_peak = None  # Handle missing data
-        '''
         # compare the two outputs
         mean_peak_error = 0
         max_peak_error = 0
@@ -123,7 +81,7 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
     plt.title("BER vs SNR")
     plt.grid(True)
     plt.tight_layout()
-    plt.show()
+    #plt.show()
     file_name = params.img_directory+'ber_snr'+str(params.num_bits)+'.png'
     if os.path.exists(file_name):
         i = 1

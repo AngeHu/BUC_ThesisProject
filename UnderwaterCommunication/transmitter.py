@@ -7,6 +7,24 @@ import time
 import sys
 from scipy.signal import chirp
 
+if tf.DEBUG:
+    import cProfile
+    import atexit
+    import pstats
+
+    # Set up profiling to save to a file
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    # Save profile results to a file on exit
+    def save_profile():
+        with open('transmitter_profile.prof', 'w') as f:  # Use 'receiver_profile.prof' for receiver.py
+            ps = pstats.Stats(profiler, stream=f)
+            ps.strip_dirs().sort_stats('cumulative').print_stats()
+
+    atexit.register(save_profile)
+
+
 t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples) # vettore tempo
 t_frame = np.linspace(0, tf.T_frame, tf.sig_samples) # vettore tempo
 chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
@@ -54,7 +72,7 @@ class Transmitter():
         self.slot = np.linspace(0, tf.t_slot, tf.chirp_samples)
         self.signal = []
         self.frequency = []
-        self.tm = tf.TimeFrame()
+
 
     # must visualize 2 graphs: one for frequency and one for signal
     def generate_frequency(self, slot):
@@ -65,7 +83,6 @@ class Transmitter():
 
     def generate_chirp(self, interval):
         self.signal = np.sin(2 * np.pi * self.frequency * (self.x - interval.start * tf.t_slot))
-        # e_signal = sum(self.signal**2) / tf.chirp_samples
         return self.signal
 
     def send_signal(self, noise):
@@ -74,7 +91,6 @@ class Transmitter():
     def generate_signal(self, slot):
         self.generate_frequency(slot)
         self.generate_chirp(slot)
-        return self.frequency, self.signal
 
 
 if __name__ == "__main__":
@@ -82,21 +98,21 @@ if __name__ == "__main__":
     data = np.random.randint(0, 2, tf.num_bits)
     np.save(tf.res_directory + 'data.npy', data)
     print(data)
-    SNR = float(sys.argv[1])
+    SNR = 10 #float(sys.argv[1])
     # turn snr to linear scale
     SNR = 10 ** (SNR / 10)
 
     transmitter = Transmitter()
+    tm = tf.TimeFrame()
     i = 0
     data = encode_signal(data)
+    noise = e_signal / SNR
 
     while i < len(data):
-        transmitter.generate_signal(transmitter.tm.timeInterval[data[i]])
-        if tf.DEBUG:
-            print("Power signal: ", e_signal)
-            print("Power noise: ", e_signal / SNR)
-        transmitter.send_signal(e_signal / SNR) # send signal with noise
+        transmitter.generate_signal(tm.timeInterval[data[i]])
+        transmitter.send_signal(noise) # send signal with noise
         i += 1
+        print("msg ", i, " sent", file=sys.stderr)
 
     time.sleep(1) # wait for receiver to finish
     transmitter.channel.close()

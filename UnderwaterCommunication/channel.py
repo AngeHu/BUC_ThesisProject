@@ -38,15 +38,10 @@ class Channel:
     def add_noise(signal, noise_level):
         noise = np.random.normal(0, 1, len(signal)) * np.sqrt(noise_level)
         # power_noise calcolato prendendo un quarto del rumore e diviso per lunghezza del chirp
-        '''
-        if tf.DEBUG:
-            print("Power noise (measured): ", sum(noise[0:tf.sig_samples] ** 2) / tf.sig_samples,
-                  file=sys.stderr)  # se diviso per len(signal) da la metà
-            print("Check SNR: ", sum(signal ** 2) / sum(noise[0:tf.sig_samples] ** 2), file=sys.stderr)
-        '''
         signal = signal + noise
         return signal
 
+    '''
     def send_data(self, data):
         try:
             self.fifo.write(data)
@@ -54,12 +49,17 @@ class Channel:
         except BrokenPipeError:
             print("BrokenPipeError: The receiver has closed the pipe.", file=sys.stderr)
             self.fifo.close()
+    '''
 
     def send_signal(self, signal, noise_level):
         noisy_signal = self.add_noise(signal, noise_level)
-        # signal_str = '\n'.join([f'{x:.5g}' for x in noisy_signal]) + '\n'
         signal_bin = struct.pack(f'{len(noisy_signal)}f', *noisy_signal)
-        self.send_data(signal_bin)
+        try:
+            self.fifo.write(signal_bin)
+            self.fifo.flush()  # Ensure data is written immediately
+        except BrokenPipeError:
+            print("BrokenPipeError: The receiver has closed the pipe.", file=sys.stderr)
+            self.fifo.close()
 
     def read_data(self):
         try:
@@ -90,13 +90,11 @@ class Channel:
 
     '''
 
-    def read_signal(self, batch_size=2400*4): #batch no more than 400
+    def read_signal(self, batch_size=tf.sig_samples*4): #batch no more than 400
         signal = []
         try:
             # Read 10 lines at a time until we get `tf.sig_samples` samples or EOF
             while len(signal) < tf.sig_samples:
-                # Read up to 10 lines
-                # read batch of bytes - one value is 4 bytes
                 data = self.fifo.read(batch_size)
                 if not data:
                     print("End of communication", file=sys.stderr)
