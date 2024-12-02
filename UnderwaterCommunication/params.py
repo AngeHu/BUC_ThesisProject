@@ -11,7 +11,7 @@ MEAN_PEAK = False
 SLOT_PEAK = True
 
 # ber/snr simulation parameters
-num_bits = 10000 # Number of bits to transmit
+num_bits = 1000000 # Number of bits to transmit
 img_directory = "./img/slot_peak/"  # directory
 res_directory = "./res/"  # directory
 
