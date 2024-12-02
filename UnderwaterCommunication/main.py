@@ -11,11 +11,11 @@ if __name__ == '__main__':
 
 
     if __name__ == "__main__":
-        #transmitter = multiprocessing.Process(target=run_script, args=("./transmitter.py",))
-        #receiver = multiprocessing.Process(target=run_script, args=("./receiver.py",))
+        transmitter = multiprocessing.Process(target=run_script, args=("./transmitter.py",))
+        receiver = multiprocessing.Process(target=run_script, args=("./receiver.py",))
 
-        transmitter = threading.Thread(target=run_script, args=("./transmitter.py",))
-        receiver = threading.Thread(target=run_script, args=("./receiver.py",))
+        #transmitter = threading.Thread(target=run_script, args=("./transmitter.py",))
+        # receiver = threading.Thread(target=run_script, args=("./receiver.py",))
 
         transmitter.start()
         receiver.start()

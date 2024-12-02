@@ -91,7 +91,7 @@ class Channel:
 
     '''
 
-    def read_signal(self, batch_size=2400 * 4): #batch no more than 400
+    def read_signal(self, batch_size=2400*4): #batch no more than 400
         signal = []
         try:
             # Read 10 lines at a time until we get `tf.sig_samples` samples or EOF

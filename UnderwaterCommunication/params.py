@@ -24,7 +24,7 @@ t_slot = T_frame/4 # periodo segnale
 t_sample = t_slot # tempo di campionamento
 
 
-SNR = 0.2 # rapporto segnale rumore
+SNR = 1  # rapporto segnale rumore
 
 class Period:
     def __init__(self, start, end, data):
