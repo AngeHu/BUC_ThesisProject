@@ -98,7 +98,7 @@ if __name__ == "__main__":
     data = np.random.randint(0, 2, tf.num_bits)
     np.save(tf.res_directory + 'data.npy', data)
     print(data)
-    SNR = 10 #float(sys.argv[1])
+    SNR = float(sys.argv[1])
     # turn snr to linear scale
     SNR = 10 ** (SNR / 10)
 
