@@ -228,11 +228,11 @@ if __name__ == "__main__":
     except Exception as e:
         print("Error: ", e, file=sys.stderr)
     finally:
-        print(rc.mean_peak_decoded)
+        # print(rc.mean_peak_decoded)
         np.save(res_directory + 'mean_peak.npy', rc.mean_peak_decoded)
-        print(rc.max_peak_decoded)
+        # print(rc.max_peak_decoded)
         np.save(res_directory + 'max_peak.npy', rc.max_peak_decoded)
-        print(rc.slot_peak_decoded)
+        # print(rc.slot_peak_decoded)
         np.save(res_directory + 'slot_peak.npy', rc.slot_peak_decoded)
         rc.channel.close()
         if not tf.BER_SNR_SIMULATION:

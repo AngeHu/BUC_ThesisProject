@@ -21,7 +21,7 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
     if not os.path.exists(params.res_directory):
         os.makedirs(params.res_directory)
     i = 0
-    snr_db = np.arange(-30, 6, 1)  # SNR range from -25 to 5 dB
+    snr_db = np.arange(-25, 16, 1)  # SNR range from -25 to 5 dB
 
     ber_mean_peak = []
     ber_max_peak = []
