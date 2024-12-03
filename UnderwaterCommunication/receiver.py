@@ -70,6 +70,7 @@ class Receiver:
         self.mean_peak_decoded = []
         self.max_peak_decoded = []
         self.slot_peak_decoded = []
+        self.peak_density_decoded = []
 
 
     def read(self):
@@ -177,9 +178,11 @@ class Receiver:
 
         # media dei picchi per slot per trovare il picco più probabile
         mean_peaks = np.zeros(4)
+        peak_density = np.zeros(4)
         for i in range(4):
             peaks_slot = peaks[np.where((peaks >= i * tf.chirp_samples) & (peaks < (i + 1) * tf.chirp_samples))]
             mean_peaks[i] = mean(amplitude_envelope, peaks_slot)
+            peak_density[i] = len(peaks_slot)
 
         max_peak = np.argmax(mean_peaks)
         if max_peak is None:
@@ -187,6 +190,10 @@ class Receiver:
             return
         # self.slot_peak_decoded = np.append(self.slot_peak_decoded, self.tm.timeInterval[max_peak].data)
         self.slot_peak_decoded.extend(self.tm.timeInterval[max_peak].data)
+
+        # peak density
+        max_density = np.argmax(peak_density)
+        self.peak_density_decoded.extend(self.tm.timeInterval[max_density].data)
 
         # plot correlation
         # disable plotting for BER/SNR simulation
@@ -234,6 +241,8 @@ if __name__ == "__main__":
         np.save(res_directory + 'max_peak.npy', rc.max_peak_decoded)
         # print(rc.slot_peak_decoded)
         np.save(res_directory + 'slot_peak.npy', rc.slot_peak_decoded)
+        # print(rc.peak_density_decoded)
+        np.save(res_directory + 'peak_density.npy', rc.peak_density_decoded)
         rc.channel.close()
         if not tf.BER_SNR_SIMULATION:
             print("Receiver OFF")

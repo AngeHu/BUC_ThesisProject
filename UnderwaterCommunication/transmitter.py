@@ -112,8 +112,6 @@ if __name__ == "__main__":
         transmitter.generate_signal(transmitter.tm.timeInterval[data[i]])
         transmitter.send_signal(noise) # send signal with noise
         i += 1
-        if i % 100 == 0:
-            print("msg ", i, " sent", file=sys.stderr)
 
     time.sleep(1) # wait for receiver to finish
     transmitter.channel.close()

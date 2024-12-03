@@ -26,6 +26,7 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
     ber_mean_peak = []
     ber_max_peak = []
     ber_slot_peak = []
+    ber_peak_density = []
 
     # matrix of bit error rate
     for i in range(len(snr_db)):
@@ -44,6 +45,7 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
         mean_peak_error = 0
         max_peak_error = 0
         slot_peak_error = 0
+        peak_density_error = 0
 
         # load original data
         original_data = np.load(params.res_directory + 'data.npy')
@@ -51,11 +53,13 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
         mean_peak_decoded = np.load(params.res_directory + 'mean_peak.npy')
         max_peak_decoded = np.load(params.res_directory + 'max_peak.npy')
         slot_peak_decoded = np.load(params.res_directory + 'slot_peak.npy')
+        peak_density_decoded = np.load(params.res_directory + 'peak_density.npy')
 
         print("Original data length: ", len(original_data))
         print("Mean peak decoded length: ", len(mean_peak_decoded))
         print("Max peak decoded length: ", len(max_peak_decoded))
         print("Slot peak decoded length: ", len(slot_peak_decoded))
+        print("Peak density decoded length: ", len(peak_density_decoded))
 
         for n in range(len(original_data)):
             if original_data[n] != mean_peak_decoded[n]:
@@ -64,17 +68,21 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
                 max_peak_error += 1
             if original_data[n] != slot_peak_decoded[n]:
                 slot_peak_error += 1
+            if original_data[n] != peak_density_decoded[n]:
+                peak_density_error += 1
 
         # append the ber to the list, if ber > 0.5, set it to 0.5
         ber_mean_peak.append( mean_peak_error/ params.num_bits if mean_peak_error / params.num_bits < 0.5 else 0.5)
         ber_max_peak.append( max_peak_error/ params.num_bits if max_peak_error / params.num_bits < 0.5 else 0.5)
         ber_slot_peak.append( slot_peak_error/ params.num_bits if slot_peak_error / params.num_bits < 0.5 else 0.5)
+        ber_peak_density.append( peak_density_error/ params.num_bits if peak_density_error / params.num_bits < 0.5 else 0.5)
 
     # plot ber/snr graph
     plt.figure()
     plt.plot(snr_db, ber_max_peak, label="Max Peak", color='red')
-    plt.plot(snr_db, ber_mean_peak, label="Mean Peak", color='blue')
-    plt.plot(snr_db, ber_slot_peak, label="Slot Peak", color='green')
+    plt.plot(snr_db, ber_mean_peak, label="Total Mean Peak", color='blue')
+    plt.plot(snr_db, ber_slot_peak, label="Slot Mean Peak", color='green')
+    plt.plot(snr_db, ber_peak_density, label="Peak Density", color='orange')
     plt.legend()
     plt.yscale('log')
     plt.ylim(None, 0.5)
