@@ -11,20 +11,36 @@ MEAN_PEAK = False
 SLOT_PEAK = True
 
 # ber/snr simulation parameters
-num_bits = 10000 # Number of bits to transmit
+num_bits = 12 # Number of bits to transmit
 img_directory = "./img/slot_peak/"  # directory
 
-T_frame = 0.1 # periodo totale del segnale - 1 sec
-f_min = 18000 # frequenza minima
-f_max = 38000 # frequenza massima
-f_sampling = 96000 # frequenza campionamento
-chirp_samples = int(f_sampling * T_frame/4) # numero di campioni per chirp
-sig_samples = chirp_samples * 4 # numero di campioni
-t_slot = T_frame/4 # periodo segnale
-t_sample = t_slot # tempo di campionamento
-
-
 SNR = 1  # rapporto segnale rumore
+
+# Doppler effect
+v_transmitter = 0 # positiva se si avvicina, negativa se si allontana
+v_receiver = 0 # positiva se si allontana, negativa se si avvicina
+F_SAMPLING = 96000 # frequenza campionamento orginale
+T_FRAME = 0.1  # durata frame originale
+c = 1500 # velocità suono m/s
+
+v_relative = v_receiver - v_transmitter # velocità relativa m/s
+scaling_factor = (c - v_receiver) / (c - v_transmitter)
+f_min = 18000 * scaling_factor # frequenza minima
+f_max = 34000 * scaling_factor # frequenza massima
+wavelength = c / ((f_max+f_min)/2) # lunghezza d'onda
+dopp_freq = v_relative/ wavelength # frequenza doppler
+f_sampling_doppler = F_SAMPLING + dopp_freq # frequenza campionamento- 96 kHz + frequenza doppler (0 se velocità trasmettitore = velocità ricevitore)
+
+# receiver
+chirp_samples = int(F_SAMPLING * T_FRAME/4)  # numero di campioni per chirp
+sig_samples =  chirp_samples * 4
+t_slot = T_FRAME/4  # periodo slot del segnale
+# transmitter
+chirp_samples_doppler = int(f_sampling_doppler * T_FRAME/4)  # numero di campioni per chirp
+sig_samples_doppler =  int(F_SAMPLING * T_FRAME/4)*3 + chirp_samples_doppler
+t_slot_doppler = (T_FRAME / 4) / scaling_factor # periodo slot con effetto doppler
+T_frame_doppler = 3 * t_slot + t_slot_doppler
+
 
 class Period:
     def __init__(self, start, end, data):

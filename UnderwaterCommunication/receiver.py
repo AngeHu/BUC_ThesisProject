@@ -12,7 +12,8 @@ from scipy.signal import chirp, spectrogram, correlate, stft, hilbert
 from scipy.fft import fftshift
 from scipy.signal import butter, lfilter, find_peaks
 import sys
-import multiprocessing
+
+animation_file = "./animation/receiver.csv"
 
 if tf.DEBUG:
     import cProfile
@@ -39,7 +40,7 @@ METHOD = 1 if tf.MAX_PEAK else 2 if tf.MEAN_PEAK else 3 if tf.SLOT_PEAK else 0
 plt.rcParams['agg.path.chunksize'] = 10000
 
 t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples) # vettore tempo
-t_frame = np.linspace(0, tf.T_frame, tf.sig_samples) # vettore tempo
+t_frame = np.linspace(0, tf.T_FRAME, tf.sig_samples) # vettore tempo
 chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
 
 def mean(x, indices):
@@ -56,7 +57,7 @@ def plot_function(x, y_sig):
 
     ax.set_xlabel('Time(s)')  # Aggiunge un'etichetta all'asse x
     ax.set_ylabel('Ampiezza')  # Aggiunge un'etichetta all'asse y1
-    ax.set_xlim(0, 4*tf.T_frame)
+    ax.set_xlim(0, 4*tf.T_FRAME)
     ax.set_ylim(-5, 5)
     plt.grid(True)  # Aggiunge una griglia al grafico (opzionale)
     plt.show()  # Mostra il grafico
@@ -78,7 +79,7 @@ class Receiver:
 
     def plot_data(self, data):
         print("Data length: ", len(data))
-        x = np.linspace(0, 4*tf.T_frame, len(data))
+        x = np.linspace(0, 4*tf.T_FRAME, len(data))
         plot_function(x, data)
 
     def plot_correlation(self, signal: np.array):
@@ -97,7 +98,7 @@ class Receiver:
     def plot_spectrogram(self, signal: np.array):
         print("Plotting spectrogram")
         print("Signal length: ", len(signal))
-        f, t, Sxx = spectrogram(signal, fs=tf.f_sampling, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
+        f, t, Sxx = spectrogram(signal, fs=tf.F_SAMPLING, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
                                 nfft=2048)
         # f, t, Sxx = stft(signal, fs=tf.sig_samples, nperseg=256)
         # Sxx_magnitude = np.abs(Sxx)
@@ -115,7 +116,7 @@ class Receiver:
         plt.show()
 
     # decode signal
-    def lowpass_filter(self, data, fs=tf.f_sampling, lowcut=tf.f_max, order=8):
+    def lowpass_filter(self, data, fs=tf.F_SAMPLING, lowcut=tf.f_max, order=8):
         b, a = butter(order, lowcut, fs=fs, btype='low')
 
         filtered_data = lfilter(b, a, data)
@@ -129,8 +130,11 @@ class Receiver:
             return None
 
         # filter and correlate signal
-        filtered_signal = self.lowpass_filter(signal)
-        correlated_signal = correlate(filtered_signal, chirp_signal, mode='same')
+        if tf.f_max < tf.F_SAMPLING/2:
+            filtered_signal = self.lowpass_filter(signal)
+            correlated_signal = correlate(filtered_signal, chirp_signal, mode='same')
+        else:
+            correlated_signal = correlate(signal, chirp_signal, mode='same')
 
         # extract analytic signal and envelope
         amplitude_envelope = np.abs(hilbert(correlated_signal))
@@ -142,7 +146,8 @@ class Receiver:
         peaks, _ = find_peaks(amplitude_envelope, height=threshold)
 
         if peaks.size == 0:
-            print("No peaks found", file=sys.stderr)
+            threshold = mean_corr + 0.5 * corr_std
+            peaks, _ = find_peaks(amplitude_envelope, height=threshold)
 
         # media totale dei picchi
 
@@ -179,7 +184,6 @@ class Receiver:
         # plot correlation
 
         # disable plotting for BER/SNR simulation
-        '''
         plt.figure()
         plt.plot(t_frame, amplitude_envelope)
         plt.plot(t_frame[peaks], amplitude_envelope[peaks], "x", color="red")
@@ -193,8 +197,6 @@ class Receiver:
             plt.savefig(img_directory + timestamp + ".png")
         else:
             plt.show()
-        '''
-
 
 
 if __name__ == "__main__":
@@ -205,27 +207,13 @@ if __name__ == "__main__":
         while True:
             data = rc.read()
             if data:
-                # float_data = [float(i) for i in data_str]
-                # data = np.append(data, float_data)
                 rc.decode_signal(data)
-
-                if len(data) >= 4 * tf.T_frame * tf.sig_samples and not tf.BER_SNR_SIMULATION:
-                    # plot data
-                    #rc.plot_data(data)
-
-                    # correlation
-                    #rc.plot_correlation(data)
-
-                    # spectrogram
-                    #rc.plot_spectrogram(data)
-                    #time.sleep(5)
-                    data = np.array([])
                 i += 1
     # print error on stderr
     except KeyboardInterrupt:
         print("Receiver interrupted", file=sys.stderr)
     except Exception as e:
-        print("Error:", e, file=sys.stderr)
+        print("Receiver Error:", e, file=sys.stderr)
     finally:
         rc.channel.close()
         print(rc.slot_peak_decoded)

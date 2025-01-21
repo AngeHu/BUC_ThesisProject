@@ -6,6 +6,7 @@ import struct
 
 fifo_path = "/tmp/channel"
 
+batch_size = tf.chirp_samples * 4
 
 class Channel:
     def __delete__(self):
@@ -91,7 +92,7 @@ class Channel:
 
     '''
 
-    def read_signal(self, batch_size=2400*4): #batch no more than 400
+    def read_signal(self, batch_size=batch_size): #batch no more than 400
         signal = []
         try:
             # Read 10 lines at a time until we get `tf.sig_samples` samples or EOF

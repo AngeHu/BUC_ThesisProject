@@ -5,7 +5,10 @@ import channel
 import params as tf
 import time
 import sys
+import csv
 from scipy.signal import chirp
+
+animation_file = "./animation/transmitter.csv"
 
 if tf.DEBUG:
     import cProfile
@@ -25,7 +28,7 @@ if tf.DEBUG:
     atexit.register(save_profile)
 
 t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples) # vettore tempo
-t_frame = np.linspace(0, tf.T_frame, tf.sig_samples) # vettore tempo
+t_frame = np.linspace(0, tf.T_frame_doppler, tf.sig_samples) # vettore tempo
 chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
 e_signal = sum(chirp_signal**2) / tf.chirp_samples # potenza segnale
 
@@ -39,9 +42,9 @@ def plot_function(x, y_freq, y_sig):
     ax1.set_ylabel('Frequenza')  # Aggiunge un'etichetta all'asse y1
     ax2.set_xlabel('Time(s)')  # Aggiunge un'etichetta all'asse x
     ax2.set_ylabel('Segnale')  # Aggiunge un'etichetta all'asse y2
-    ax1.set_xlim(0, 4*tf.T_frame)
-    ax1.set_ylim(0, 50000)
-    ax2.set_xlim(0, 4*tf.T_frame)
+    ax1.set_xlim(0, tf.T_frame_doppler)
+    ax1.set_ylim(0, 500)
+    ax2.set_xlim(0, tf.T_frame_doppler)
     ax2.set_ylim(-1, 1)
     plt.grid(True)  # Aggiunge una griglia al grafico (opzionale)
     plt.tight_layout() # Aggiusta il layout per fare spazio alle etichette
@@ -64,24 +67,26 @@ def encode_signal(data):
 
 
 class Transmitter():
+
     def __init__(self):
         self.channel = channel.Channel("wb")
         if not tf.BER_SNR_SIMULATION: print("Transmitter ON")
-        self.x = np.linspace(0, tf.T_frame, tf.sig_samples)
-        self.slot = np.linspace(0, tf.t_slot, tf.chirp_samples)
+        self.x = np.linspace(0, tf.T_frame_doppler, tf.sig_samples)
         self.signal = []
         self.frequency = []
 
     # must visualize 2 graphs: one for frequency and one for signal
     def generate_frequency(self, interval):
         self.frequency = np.full(tf.sig_samples, 0)
-        self.frequency[interval.start*tf.chirp_samples: interval.end*tf.chirp_samples] = np.linspace(tf.f_min, tf.f_max, tf.chirp_samples)
+        self.frequency[interval.start*tf.chirp_samples:interval.start*tf.chirp_samples+tf.chirp_samples_doppler] = np.linspace(tf.f_min, tf.f_max, tf.chirp_samples_doppler)
+        print(self.frequency[interval.start*tf.chirp_samples])
+        print(self.frequency[interval.end*tf.chirp_samples-1])
         #plot_function(self.x, self.frequency, "Frequenza", "t", "f", False)
         return self.frequency
 
     def generate_chirp(self, interval):
         self.signal = np.sin(2 * np.pi * self.frequency * (self.x - interval.start * tf.t_slot))
-        e_signal = sum(self.signal**2) / tf.chirp_samples
+        e_signal = sum(self.signal**2) / tf.chirp_samples_doppler
         return self.signal, e_signal
 
     def send_signal(self, noise):
@@ -91,8 +96,22 @@ class Transmitter():
         self.generate_frequency(slot)
         self.generate_chirp(slot)
 
+    def save_to_csv(self, filename, counter):
+        # Calculate the time values for the current slot
+        time_values = self.x + counter * tf.T_frame_doppler
+
+        # Prepare data rows in bulk
+        rows = [[t, sig, freq] for t, sig, freq in zip(time_values, self.signal, self.frequency)]
+
+        # Append rows to the CSV file
+        with open(filename, 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows(rows)
+            file.flush()
+
 
 if __name__ == "__main__":
+    print(tf.T_frame_doppler)
     if tf.BER_SNR_SIMULATION:
         # generate bit sequence
         data = np.random.randint(0, 2, tf.num_bits)
@@ -116,23 +135,20 @@ if __name__ == "__main__":
     frq = np.array([])
     sig = np.array([])
 
+    with open(animation_file, 'w') as file:
+        writer = csv.DictWriter(file, fieldnames=["time", "signal", "frequency"])
+        writer.writeheader()
+
+
     while i < len(data):
-        #frq = np.append(frq, transmitter.generate_frequency(tm.timeInterval[data[i]]))
-        #generated_sig, E_signal = transmitter.generate_chirp(tm.timeInterval[data[i]])
-        #sig = np.append(sig, generated_sig)
         transmitter.generate_signal(tm.timeInterval[data[i]])
-        #if tf.DEBUG:
-            #print("Power signal: ", E_signal)
-            #print("Power noise: ", E_signal / SNR)
         transmitter.send_signal(e_signal / SNR) # send signal with noise
+        # write to file for animation
+        transmitter.save_to_csv(animation_file, i)
         i += 1
         print("msg ", i)
-        '''
-        if i % 4 == 0: # plot every 4 signal
-            if not tf.BER_SNR_SIMULATION: plot_function(np.linspace(0, 4 * tf.T_frame, 4 * 4 * tf.chirp_samples), frq, sig)
-            frq = np.array([])
-            sig = np.array([])
-        '''
+        plot_function(transmitter.x, transmitter.frequency, transmitter.signal)
+
 
     # transmitter.channel.send_data("EOF")
 
@@ -142,9 +158,6 @@ if __name__ == "__main__":
 
     if not tf.BER_SNR_SIMULATION:
         print("Transmitter OFF")
-
-
-
 
 
 

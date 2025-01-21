@@ -1,130 +1,113 @@
-'''
-#TODO: Add the ability to plot the signal and the frequency in real time
-#TODO: Add labels to the plots
-#TODO: Add titles to the plots
-import random
-import matplotlib
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
-import numpy as np
-import timeframe as tf
+import matplotlib
 from matplotlib.animation import FuncAnimation
+import params
+import traceback
+import params  # Ensure this module defines T_frame
+matplotlib.use('TkAgg')
 
-BATCH_SIZE = 1000
+BATCH_SIZE = 800  # Number of new rows to read from the CSV
+FRAME_SIZE = 4*params.sig_samples  # Maximum number of data points to display
+INTERVAL = 1 # Milliseconds between updates
+# Global data arrays
+time_data, signal_data, frequency_data = [], [], []
+last_position = 0  # Track the last read position in the CSV
+transmitter_file = "./animation/transmitter.csv"
 
-class Animation:
-    # initial data
-    def __init__(self):
-        self.x = [0]
-        self.y_freq = [0]
-        self.y_sig = [0]
+# Function to read new rows from the CSV
+def read_new_data(last_position, batch_size=BATCH_SIZE):
+    global time_data, signal_data, frequency_data
+    new_lines = []
+    with open(transmitter_file, 'r') as file:
+        if last_position == 0:
+            header = file.readline()  # Skip the header on the first read
+            print(f"Header skipped: {header.strip()}")
+            last_position = file.tell()
+        file.seek(last_position)
+        for _ in range(batch_size):
+            line = file.readline()
+            if not line:
+                break
+            new_lines.append(line)
+        last_position = file.tell()  # Update position after reading
 
-        # creating the first plot and frame
-        self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1)
-        self.freq, = self.ax1.plot(self.x, self.y_freq, color='g')
-        self.sig, = self.ax2.plot(self.x, self.y_sig, color='r')
+    if new_lines:
+        new_data = [line.strip().split(",") for line in new_lines]
+        try:
+            time_data.extend([float(row[0]) for row in new_data])
+            signal_data.extend([float(row[1]) for row in new_data])
+            frequency_data.extend([float(row[2]) for row in new_data])
+        except (ValueError, IndexError) as e:
+            print("Malformed data detected and skipped.")
+            print("Detailed Error Information:")
+            # Print the exception details
+            print(f"Exception Type: {type(e).__name__}")
+            print(f"Exception Message: {e}")
+            # Print the entire stack trace
+            print("Stack Trace:")
+            traceback.print_exc()
+            # Print the problematic data
+            print("Problematic Data:")
+            print(new_data)
 
-        self.ax1.set_ylim(0,50000)
-        self.ax2.set_ylim(-1, 1)
+        # Limit data length for smoother animation
+        if len(time_data) > FRAME_SIZE:
+            time_data[:] = time_data[-FRAME_SIZE:]
+            signal_data[:] = signal_data[-FRAME_SIZE:]
+            frequency_data[:] = frequency_data[-FRAME_SIZE:]
 
-        self.ax1.set_xlim(0, 4*tf.T_frame)
-        self.ax1.set_xlim(0, 4*tf.T_frame)
-        self.ax2.sharex(self.ax1)
-        self.index = 0
-
-    def add_data(self):
-        self.time = [self.x[-1]]
-        for i in range(BATCH_SIZE-1):
-            self.time.append(self.time[-1] + tf.T_frame / tf.f_sampling)
-        sig_new = np.sin(np.asarray(self.time) * 2 * np.pi)
-        frq_new = np.random.randint(0, 50000, BATCH_SIZE)
-        return frq_new, sig_new
-        
-
-    # updates the data and freq
-    def update(self, frame):
-        frq_new, sig_new = self.add_data()
-        # Update the rolling buffer of x and y data to maintain a fixed window
-        if(self.x[-1] < 4*tf.T_frame):
-            self.x = np.append(self.x, self.time)
-            self.y_freq = np.append(self.y_freq, frq_new)
-            self.y_sig = np.append(self.y_sig, sig_new)
-        else:
-            self.x = np.append(self.x[BATCH_SIZE:], self.time)  # Remove the oldest x value and append the new one
-            self.y_freq = np.append(self.y_freq[BATCH_SIZE:], frq_new)  # Remove the oldest y value and append the new one
-            self.y_sig = np.append(self.y_sig[BATCH_SIZE:], sig_new)  # Remove the oldest y value and append the new one
-            # Adjust the x-axis to always show the latest window
-            self.ax1.set_xlim(self.x[0], self.x[-1])
-
-        # Update the plot with new data
-        self.freq.set_xdata(self.x)
-        self.freq.set_ydata(self.y_freq)
-        self.sig.set_xdata(self.x)
-        self.sig.set_ydata(self.y_sig)
+    return last_position
 
 
-    def animate(self):
-        self.anim = FuncAnimation(self.fig, self.update, frames=None,save_count=100, interval=1)
-        plt.pause(0.01)
+# Set up the figure and axes for animation
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
+
+# Signal plot
+ax1.set_title("Signal")
+ax1.grid(True)
+ax1.set_xlim(0, 10)  # Initial x-axis limit
+ax1.set_ylim(-1, 1)
+line1, = ax1.plot([], [], lw=2, label="Signal", color='blue')
+ax1.set_xlabel("Time (s)")
+ax1.set_ylabel("Amplitude")
+ax1.legend()
+
+# Frequency plot
+ax2.set_title("Frequency")
+ax2.grid(True)
+ax2.set_xlim(0, 10)  # Match initial x-axis limit of ax1
+ax2.set_ylim(0, 50000)
+line2, = ax2.plot([], [], lw=2, label="Frequency", color='orange')
+ax2.set_xlabel("Time (s)")
+ax2.set_ylabel("Frequency (Hz)")
+ax2.legend()
+
+# Animation function
+def update(frame):
+    global last_position
+    # Fetch new data
+    new_position = read_new_data(last_position)
+    if new_position == last_position:
+        # No new data, skip update
+        return line1, line2
+    last_position = new_position
+
+    if time_data:
+        # Update the line data
+        line1.set_data(time_data, signal_data)
+        line2.set_data(time_data, frequency_data)
+
+        # Adjust the x-axis to show the latest data window
+        start_time = time_data[0]
+        end_time = time_data[-1]
+        ax1.set_xlim(start_time, end_time)
+        ax2.set_xlim(start_time, end_time)
+
+    return line1, line2
 
 
 if __name__ == "__main__":
-    a = Animation()
-    a.animate()
-'''
-
-
-import numpy as np
-import params as tf
-from bokeh.plotting import figure, curdoc
-from bokeh.models import ColumnDataSource
-import multiprocessing as mp
-
-# compute new values in side process
-
-
-BATCH_SIZE = 1000
-UNDERSAMPLING_FACTOR = 100
-
-sampling_rate = tf.f_sampling/UNDERSAMPLING_FACTOR
-sampling_time = tf.t_slot/sampling_rate # Time between samples
-
-# Set up data
-x = np.array([0])
-y = np.sin(x)
-
-# Create a ColumnDataSource (used for updating the plot)
-source = ColumnDataSource(data={'x': x, 'y': y})
-
-initial_x_range = (0, 4*tf.T_frame)  # Display the x-axis from 0 to 5 initially
-initial_y_range = (-1, 1)  # Display the y-axis from -1 to 1 initially
-
-# Create a figure and line plot
-plot = figure(title="Sine Wave Animation", x_axis_label='x', y_axis_label='y', y_range=initial_y_range, x_range=initial_x_range)
-plot.line('x', 'y', source=source)
-
-# Define the callback function that will update the plot periodically
-def update():
-    global x, y
-    for i in range(BATCH_SIZE):
-        x = np.append(x, x[-1] + sampling_time)
-        y = np.append(y, np.sin(x[-1]))
-    if x[-1] > 4*tf.T_frame:
-        x = x[BATCH_SIZE:]
-        y = y[BATCH_SIZE:]
-        #update the x-axis to always show the latest window
-        plot.x_range.start = x[0]
-        plot.x_range.end = x[-1]
-
-
-    # Update the ColumnDataSource with
-    source.data = {'x': x, 'y': y}
-
-# Add a periodic callback that runs every 1 millisecond (0.001 seconds)
-curdoc().add_periodic_callback(update, 1)
-
-# Add the plot to the current document
-curdoc().add_root(plot)
-
-# Run the application with 'bokeh serve' command
-# bokeh serve --show animation.py
+    # Create the animation
+    ani = FuncAnimation(fig, update, interval=INTERVAL)  # Update every 500 ms
+    plt.tight_layout()
+    plt.show()
