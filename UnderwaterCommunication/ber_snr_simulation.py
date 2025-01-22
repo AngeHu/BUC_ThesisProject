@@ -1,3 +1,4 @@
+# Deprecated: This file is deprecated and will be removed in the future.
 import subprocess
 import params
 import numpy as np

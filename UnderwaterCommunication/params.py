@@ -25,8 +25,10 @@ c = 1500 # velocità suono m/s
 
 v_relative = v_receiver - v_transmitter # velocità relativa m/s
 scaling_factor = (c - v_receiver) / (c - v_transmitter)
-f_min = 18000 * scaling_factor # frequenza minima
-f_max = 34000 * scaling_factor # frequenza massima
+f_min = 18000 # frequenza minima
+f_max = 34000 # frequenza massima
+f_min_scaled = f_min * scaling_factor
+f_max_scaled = f_max * scaling_factor
 wavelength = c / ((f_max+f_min)/2) # lunghezza d'onda
 dopp_freq = v_relative/ wavelength # frequenza doppler
 f_sampling_doppler = F_SAMPLING + dopp_freq # frequenza campionamento- 96 kHz + frequenza doppler (0 se velocità trasmettitore = velocità ricevitore)

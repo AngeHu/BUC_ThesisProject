@@ -8,7 +8,7 @@ import sys
 import csv
 from scipy.signal import chirp
 
-animation_file = "./animation/transmitter.csv"
+#TODO: animare il segnale trasmesso senza effetto doppler!
 
 if tf.DEBUG:
     import cProfile
@@ -27,10 +27,11 @@ if tf.DEBUG:
 
     atexit.register(save_profile)
 
-t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples) # vettore tempo
-t_frame = np.linspace(0, tf.T_frame_doppler, tf.sig_samples) # vettore tempo
+# global variables
+animation_file = "./animation/transmitter.csv"
+t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples_doppler) # vettore tempo
 chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
-e_signal = sum(chirp_signal**2) / tf.chirp_samples # potenza segnale
+e_signal = sum(chirp_signal**2) / tf.chirp_samples_doppler # potenza segnale
 
 # plot every 4*2 bits
 def plot_function(x, y_freq, y_sig):
@@ -72,42 +73,63 @@ class Transmitter():
         self.channel = channel.Channel("wb")
         if not tf.BER_SNR_SIMULATION: print("Transmitter ON")
         self.x = np.linspace(0, tf.T_frame_doppler, tf.sig_samples)
-        self.signal = []
         self.frequency = []
+        self.signal = []
+        self.original_frequency = []
+        self.original_signal = []
+        # if signal is affected by doppler effect, keep count of the number of bits sent
+        self.previous_data = -1
+        self.extra_zero = 0
 
-    # must visualize 2 graphs: one for frequency and one for signal
-    def generate_frequency(self, interval):
-        self.frequency = np.full(tf.sig_samples, 0)
-        self.frequency[interval.start*tf.chirp_samples:interval.start*tf.chirp_samples+tf.chirp_samples_doppler] = np.linspace(tf.f_min, tf.f_max, tf.chirp_samples_doppler)
-        print(self.frequency[interval.start*tf.chirp_samples])
-        print(self.frequency[interval.end*tf.chirp_samples-1])
-        #plot_function(self.x, self.frequency, "Frequenza", "t", "f", False)
-        return self.frequency
+    ### Generate the signal to be sent:
+    # 1. Generate the frequency
+    # 2. Generate the chirp signal
+    def generate_signal(self, data):
+        self.generate_frequency(data)
+        self.generate_chirp(data)
 
-    def generate_chirp(self, interval):
-        self.signal = np.sin(2 * np.pi * self.frequency * (self.x - interval.start * tf.t_slot))
-        e_signal = sum(self.signal**2) / tf.chirp_samples_doppler
-        return self.signal, e_signal
+    def generate_frequency(self, data):
+        # if data is the same as the previous one, do not calculate again
+        if data != self.previous_data:
+            # generate 2 frequencies if doppler effect is present
+            if tf.v_relative != 0:
+                start = data * tf.chirp_samples
+                end = start + tf.chirp_samples
+                self.original_frequency = np.full(tf.sig_samples, 0)
+                self.original_frequency[start:end] = np.linspace(tf.f_min, tf.f_max, tf.sig_samples)
+            start = data * tf.chirp_samples
+            end = start + tf.chirp_samples_doppler
+            self.frequency = np.full(tf.sig_samples_doppler, 0)
+            self.frequency[start:end] = np.linspace(tf.f_min, tf.f_max, tf.chirp_samples_doppler)
+            if tf.sig_samples > tf.sig_samples_doppler: #signal is affected by doppler effect: compressed, so we need to add extra zeros
+                np.append(self.frequency, np.zeros(tf.sig_samples - tf.sig_samples_doppler))
+                print("frequency samples: ", len(self.frequency))
+        return self.frequency, self.original_frequency
 
-    def send_signal(self, noise):
-        self.channel.send_signal(self.signal, noise)
-
-    def generate_signal(self, slot):
-        self.generate_frequency(slot)
-        self.generate_chirp(slot)
+    def generate_chirp(self, data):
+        if data != self.previous_data:
+            if tf.v_relative != 0:
+                self.original_signal = np.sin(2 * np.pi * self.original_frequency * (self.x - data * tf.t_slot))
+            self.signal = np.sin(2 * np.pi * self.frequency * (self.x - data * tf.t_slot))
+        # e_signal = sum(self.signal**2) / tf.chirp_samples_doppler
+        return self.signal #, e_signal
 
     def save_to_csv(self, filename, counter):
         # Calculate the time values for the current slot
-        time_values = self.x + counter * tf.T_frame_doppler
-
+        time_values = self.x + counter * tf.T_FRAME
         # Prepare data rows in bulk
-        rows = [[t, sig, freq] for t, sig, freq in zip(time_values, self.signal, self.frequency)]
-
+        if tf.v_relative != 0:
+            rows = [[t, sig, freq] for t, sig, freq in zip(time_values, self.original_signal, self.original_frequency)]
+        else:
+            rows = [[t, sig, freq] for t, sig, freq in zip(time_values, self.signal, self.frequency)]
         # Append rows to the CSV file
         with open(filename, 'a', newline='') as file:
             writer = csv.writer(file)
             writer.writerows(rows)
             file.flush()
+
+    def send_signal(self, noise):
+        self.channel.send_signal(self.signal, noise)
 
 
 if __name__ == "__main__":
@@ -141,7 +163,7 @@ if __name__ == "__main__":
 
 
     while i < len(data):
-        transmitter.generate_signal(tm.timeInterval[data[i]])
+        transmitter.generate_signal(data[i])
         transmitter.send_signal(e_signal / SNR) # send signal with noise
         # write to file for animation
         transmitter.save_to_csv(animation_file, i)
@@ -149,11 +171,7 @@ if __name__ == "__main__":
         print("msg ", i)
         plot_function(transmitter.x, transmitter.frequency, transmitter.signal)
 
-
-    # transmitter.channel.send_data("EOF")
-
     time.sleep(1) # wait for receiver to finish
-
     transmitter.channel.close()
 
     if not tf.BER_SNR_SIMULATION:
