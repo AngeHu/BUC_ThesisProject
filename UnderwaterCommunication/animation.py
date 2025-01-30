@@ -3,16 +3,19 @@ import matplotlib
 from matplotlib.animation import FuncAnimation
 import params
 import traceback
-import params  # Ensure this module defines T_frame
 matplotlib.use('TkAgg')
 
 BATCH_SIZE = 800  # Number of new rows to read from the CSV
 FRAME_SIZE = 4*params.sig_samples  # Maximum number of data points to display
+FRAME_SIZE_DOPPLER = 4*params.sig_samples_doppler  # Maximum number of data points to display
 INTERVAL = 1 # Milliseconds between updates
 # Global data arrays
 time_data, signal_data, frequency_data = [], [], []
-last_position = 0  # Track the last read position in the CSV
+doppler_time, doppler_signal, doppler_frequency = [], [], []
+transmitter_last_position = 0  # Track the last read position in the CSV
+doppler_last_position = 0  # Track the last read position in the CSV
 transmitter_file = "./animation/transmitter.csv"
+doppler_file = "./animation/transmitter_doppler.csv"
 
 # Function to read new rows from the CSV
 def read_new_data(last_position, batch_size=BATCH_SIZE):
@@ -58,9 +61,56 @@ def read_new_data(last_position, batch_size=BATCH_SIZE):
 
     return last_position
 
+counter = 0
+def read_doppler_data(last_position, batch_size=BATCH_SIZE):
+    global doppler_time, doppler_signal, doppler_frequency, counter
+    new_lines = []
+    with open(doppler_file, 'r') as file:
+        if last_position == 0:
+            header = file.readline()  # Skip the header on the first read
+            print(f"Header skipped: {header.strip()}")
+            last_position = file.tell()
+        file.seek(last_position)
+        for _ in range(batch_size):
+            line = file.readline()
+            if not line:
+                break
+            new_lines.append(line)
+        last_position = file.tell()  # Update position after reading
+
+    if new_lines:
+        new_data = [line.strip().split(",") for line in new_lines]
+        try:
+            doppler_time.extend([float(row[0]) for row in new_data])
+            doppler_signal.extend([float(row[1]) for row in new_data])
+            doppler_frequency.extend([float(row[2]) for row in new_data])
+            counter = counter + len(new_data)
+        except (ValueError, IndexError) as e:
+            print("Malformed data detected and skipped.")
+            print("Detailed Error Information:")
+            # Print the exception details
+            print(f"Exception Type: {type(e).__name__}")
+            print(f"Exception Message: {e}")
+            # Print the entire stack trace
+            print("Stack Trace:")
+            traceback.print_exc()
+            # Print the problematic data
+            print("Problematic Data:")
+            print(new_data)
+
+        # Limit data length for smoother animation
+        if len(doppler_time) > FRAME_SIZE:
+            doppler_time[:] = doppler_time[-FRAME_SIZE:]
+            doppler_signal[:] = doppler_signal[-FRAME_SIZE:]
+            doppler_frequency[:] = doppler_frequency[-FRAME_SIZE:]
+
+    return last_position
+
 
 # Set up the figure and axes for animation
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
+fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(8, 6))
+fig.suptitle("Underwater Acoustic Communication Simulation", fontsize=16)
+fig.tight_layout()
 
 # Signal plot
 ax1.set_title("Signal")
@@ -82,20 +132,52 @@ ax2.set_xlabel("Time (s)")
 ax2.set_ylabel("Frequency (Hz)")
 ax2.legend()
 
+# Doppler plot
+title = str(params.v_relative) + " m/s relative velocity"
+ax3.set_title("Signal with Doppler Effect" + title)
+ax3.grid(True)
+ax3.set_xlim(0, 10)  # Match initial x-axis limit of ax1
+ax3.set_ylim(-1, 1)
+line3, = ax3.plot([], [], lw=2, label="Amplitude", color='red')
+ax3.set_ylabel("Amplitude")
+ax3.set_xlabel("Time (s)")
+
+# Doppler Frequency plot
+ax4.set_title("Frequency with Doppler Effect" + title)
+ax4.grid(True)
+ax4.set_xlim(0, 10)  # Match initial x-axis limit of ax1
+ax4.set_ylim(0, 50000)
+line4, = ax4.plot([], [], lw=2, label="Amplitude", color='green')
+ax4.set_xlabel("Time (s)")
+ax4.set_ylabel("Amplitude")
+
+
 # Animation function
 def update(frame):
-    global last_position
+    global transmitter_last_position, doppler_last_position, counter
     # Fetch new data
-    new_position = read_new_data(last_position)
-    if new_position == last_position:
+    transmitter_position = read_new_data(transmitter_last_position)
+    doppler_position = read_doppler_data(doppler_last_position)
+    if transmitter_position == transmitter_last_position:
         # No new data, skip update
         return line1, line2
-    last_position = new_position
+    transmitter_last_position = transmitter_position
+
+    if doppler_position == doppler_last_position:
+        print(doppler_last_position)
+        # No new data, skip update
+        return line3, line4
+    doppler_last_position = doppler_position
+    print("counter: ", counter)
 
     if time_data:
         # Update the line data
         line1.set_data(time_data, signal_data)
         line2.set_data(time_data, frequency_data)
+
+    if doppler_time:
+        line3.set_data(doppler_time, doppler_signal)
+        line4.set_data(doppler_time, doppler_frequency)
 
         # Adjust the x-axis to show the latest data window
         start_time = time_data[0]
@@ -103,7 +185,12 @@ def update(frame):
         ax1.set_xlim(start_time, end_time)
         ax2.set_xlim(start_time, end_time)
 
-    return line1, line2
+        start_time = doppler_time[0]
+        end_time = doppler_time[-1]
+        ax3.set_xlim(start_time, end_time)
+        ax4.set_xlim(start_time, end_time)
+
+    return line1, line2, line3, line4
 
 
 if __name__ == "__main__":

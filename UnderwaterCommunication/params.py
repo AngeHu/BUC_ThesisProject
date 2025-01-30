@@ -11,17 +11,18 @@ MEAN_PEAK = False
 SLOT_PEAK = True
 
 # ber/snr simulation parameters
-num_bits = 12 # Number of bits to transmit
+num_bits = 4 # Number of bits to transmit
 img_directory = "./img/slot_peak/"  # directory
 
 SNR = 1  # rapporto segnale rumore
 
 # Doppler effect
 v_transmitter = 0 # positiva se si avvicina, negativa se si allontana
-v_receiver = 0 # positiva se si allontana, negativa se si avvicina
+v_receiver = 1000 # positiva se si allontana, negativa se si avvicina
 F_SAMPLING = 96000 # frequenza campionamento orginale
 T_FRAME = 0.1  # durata frame originale
 c = 1500 # velocità suono m/s
+T_SAMPLING = 1/F_SAMPLING # periodo campionamento
 
 v_relative = v_receiver - v_transmitter # velocità relativa m/s
 scaling_factor = (c - v_receiver) / (c - v_transmitter)

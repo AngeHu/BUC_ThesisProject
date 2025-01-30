@@ -12,6 +12,7 @@ from scipy.signal import chirp, spectrogram, correlate, stft, hilbert
 from scipy.fft import fftshift
 from scipy.signal import butter, lfilter, find_peaks
 import sys
+import csv
 
 animation_file = "./animation/receiver.csv"
 
@@ -66,6 +67,7 @@ class Receiver:
     def __init__(self):
         self.channel = channel.Channel("rb")
         if not tf.BER_SNR_SIMULATION: print("Receiver ON")
+        self.x = np.linspace(0, tf.T_FRAME, tf.sig_samples)
         self.correlation = []
         self.mean_peak_decoded =np.array([], dtype=np.int8)  # data to decipher
         self.max_peak_decoded = np.array([], dtype=np.int8)  # data to decipher
@@ -198,6 +200,16 @@ class Receiver:
         else:
             plt.show()
 
+    def save_to_csv(self, filename, counter, data):
+        # Calculate the time values for the current slot
+        time_values = self.x + counter * tf.T_FRAME
+        # Prepare data rows in bulk
+        rows = [[t, sig] for t, sig in zip(time_values, data)]
+        # Append rows to the CSV file
+        with open(filename, 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows(rows)
+            file.flush()
 
 if __name__ == "__main__":
     rc = Receiver()
@@ -206,9 +218,12 @@ if __name__ == "__main__":
     try:
         while True:
             data = rc.read()
-            if data:
+            if data != []:
                 rc.decode_signal(data)
                 i += 1
+                # rc.save_to_csv(animation_file, i, data)
+            else:
+                break
     # print error on stderr
     except KeyboardInterrupt:
         print("Receiver interrupted", file=sys.stderr)

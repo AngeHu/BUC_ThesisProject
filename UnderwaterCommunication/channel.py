@@ -63,7 +63,7 @@ class Channel:
         signal_str = struct.pack(f'{len(noisy_signal)}f', *noisy_signal)
         self.send_data(signal_str)
 
-    def read_data(self):
+    def read_data(self): # deprecated
         try:
             data = self.fifo.readline()
             if data == 'EOF':
@@ -130,7 +130,7 @@ class Channel:
         except BrokenPipeError:
             print("BrokenPipeError: The transmitter has closed the pipe.", file=sys.stderr)
             self.fifo.close()
-            return None
+            return signal
 
     def close(self):
         self.fifo.close()
