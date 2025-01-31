@@ -158,15 +158,11 @@ def update(frame):
     # Fetch new data
     transmitter_position = read_new_data(transmitter_last_position)
     doppler_position = read_doppler_data(doppler_last_position)
-    if transmitter_position == transmitter_last_position:
-        # No new data, skip update
-        return line1, line2
-    transmitter_last_position = transmitter_position
 
-    if doppler_position == doppler_last_position:
-        print(doppler_last_position)
+    if doppler_position == doppler_last_position and transmitter_position == transmitter_last_position :
         # No new data, skip update
-        return line3, line4
+        return line1, line2, line3, line4
+    transmitter_last_position = transmitter_position
     doppler_last_position = doppler_position
     print("counter: ", counter)
 
