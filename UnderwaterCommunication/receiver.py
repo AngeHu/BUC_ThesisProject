@@ -39,7 +39,7 @@ res_directory = tf.res_directory
 plt.rcParams['agg.path.chunksize'] = 10000
 
 t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples) # vettore tempo
-t_frame = np.linspace(0, tf.T_frame, tf.sig_samples) # vettore tempo
+t_frame = np.linspace(0, tf.T_FRAME, tf.sig_samples) # vettore tempo
 chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
 
 def mean(x, indices):
@@ -56,7 +56,7 @@ def plot_function(x, y_sig):
 
     ax.set_xlabel('Time(s)')  # Aggiunge un'etichetta all'asse x
     ax.set_ylabel('Ampiezza')  # Aggiunge un'etichetta all'asse y1
-    ax.set_xlim(0, 4*tf.T_frame)
+    ax.set_xlim(0, 4*tf.T_FRAME)
     ax.set_ylim(-5, 5)
     plt.grid(True)  # Aggiunge una griglia al grafico (opzionale)
     plt.show()  # Mostra il grafico
@@ -75,8 +75,6 @@ class Receiver:
 
     def read(self):
         data = self.channel.read_signal()
-        if data is None:
-            return None
         return data
 
     def plot_data(self, data):
@@ -123,7 +121,7 @@ class Receiver:
         plt.show()
 
     # decode signal
-    def lowpass_filter(self, data, fs=tf.f_sampling, lowcut=tf.f_max, order=8):
+    def lowpass_filter(self, data, fs=tf.F_SAMPLING, lowcut=tf.f_max, order=8):
         b, a = butter(order, lowcut, fs=fs, btype='low')
 
         filtered_data = lfilter(b, a, data)
@@ -197,37 +195,16 @@ class Receiver:
 
         # plot correlation
         # disable plotting for BER/SNR simulation
-        '''
-        plt.figure()
-        plt.plot(t_frame, amplitude_envelope)
-        plt.plot(t_frame[peaks], amplitude_envelope[peaks], "x", color="red")
-        plt.title("Correlation with Chirp")
-        plt.xlabel("Time [s]")
-        plt.ylabel("Correlation")
-        plt.grid(True)
-        if SAVE_IMG:
-            timestamp = time.time()
-            timestamp = str(timestamp).replace(".", "")
-            plt.savefig(img_directory + timestamp + ".png")
-        else:
-            plt.show()
-        '''
-
 
 
 if __name__ == "__main__":
     rc = Receiver()
     i = 0
     data = np.array([])
-    '''
-    if tf.BER_SNR_SIMULATION:
-        method = int(sys.argv[1])
-    else:
-        method = 1 if tf.MAX_PEAK else 2 if tf.MEAN_PEAK else 3 if tf.SLOT_PEAK else 0
-    '''
     try:
         while True:
             data = rc.read()
+            print("Data length: ", len(data))
             if data:
                 rc.decode_signal(data)
             else:

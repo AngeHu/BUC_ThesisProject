@@ -24,11 +24,10 @@ if tf.DEBUG:
 
     atexit.register(save_profile)
 
-
-t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples) # vettore tempo
-t_frame = np.linspace(0, tf.T_frame, tf.sig_samples) # vettore tempo
-chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
-e_signal = sum(chirp_signal**2) / tf.chirp_samples # potenza segnale
+t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples_doppler) # vettore tempo
+chirp_signal = chirp(t_slot, f0=tf.f_min_scaled, f1=tf.f_max_scaled, t1=tf.t_slot, method='linear') # segnale chirp
+e_signal = sum(chirp_signal**2) / tf.chirp_samples_doppler # potenza segnale
+t_sampling = tf.T_SAMPLING
 
 # plot every 4*2 bits
 def plot_function(x, y_freq, y_sig):
@@ -40,9 +39,9 @@ def plot_function(x, y_freq, y_sig):
     ax1.set_ylabel('Frequenza')  # Aggiunge un'etichetta all'asse y1
     ax2.set_xlabel('Time(s)')  # Aggiunge un'etichetta all'asse x
     ax2.set_ylabel('Segnale')  # Aggiunge un'etichetta all'asse y2
-    ax1.set_xlim(0, 4*tf.T_frame)
+    ax1.set_xlim(0, 4*tf.T_FRAME)
     ax1.set_ylim(0, 50000)
-    ax2.set_xlim(0, 4*tf.T_frame)
+    ax2.set_xlim(0, 4*tf.T_FRAME)
     ax2.set_ylim(-1, 1)
     plt.grid(True)  # Aggiunge una griglia al grafico (opzionale)
     plt.tight_layout() # Aggiusta il layout per fare spazio alle etichette
@@ -66,24 +65,59 @@ def encode_signal(data):
 
 class Transmitter():
     def __init__(self):
-        self.channel = channel.Channel('wb')
-        if not tf.BER_SNR_SIMULATION: ("Transmitter ON")
-        self.x = np.linspace(0, tf.T_frame, tf.chirp_samples*4)
-        self.slot = np.linspace(0, tf.t_slot, tf.chirp_samples)
-        self.tm = tf.TimeFrame()
-        self.signal = np.array([])
+        self.channel = channel.Channel("wb")
+        if not tf.BER_SNR_SIMULATION: print("Transmitter ON")
+        self.x = np.linspace(0, tf.T_FRAME, tf.sig_samples)
         self.frequency = np.array([])
-
+        self.signal = np.array([])
+        self.original_frequency = []
+        self.original_signal = []
+        # if signal is affected by doppler effect, keep count of the number of bits sent
+        self.previous_data = -1
+        self.extra_zero = tf.sig_samples_doppler - tf.sig_samples
+        print("extra zero: ", self.extra_zero)
+        self.last_frame = 0
 
     # must visualize 2 graphs: one for frequency and one for signal
-    def generate_frequency(self, slot):
-        self.frequency = np.full(tf.chirp_samples * 4, 0)
-        self.frequency[slot.start*tf.chirp_samples: slot.end*tf.chirp_samples] = np.linspace(tf.f_min, tf.f_max, tf.chirp_samples)
-        #plot_function(self.x, self.frequency, "Frequenza", "t", "f", False)
-        return self.frequency
+    def generate_frequency(self, data):
+        start = data * tf.chirp_samples
+        end = start + tf.chirp_samples_doppler
+        self.frequency = np.full(tf.sig_samples_doppler, 0)
+        self.frequency[start:end] = np.linspace(tf.f_min_scaled, tf.f_max_scaled, tf.chirp_samples_doppler)
 
-    def generate_chirp(self, interval):
-        self.signal = np.sin(2 * np.pi * self.frequency * (self.x - interval.start * tf.t_slot))
+        # adjust frequency samples if signal is affected by doppler effect
+        if self.extra_zero < 0:  # signal is affected by doppler effect: compressed, so we need to add extra zeros
+            # np.append(self.frequency, np.zeros(abs(self.extra_zero)))
+            print("extra zero: ", abs(self.extra_zero))
+            self.frequency = np.pad(self.frequency, (0, abs(int(self.extra_zero))), 'constant', constant_values=0)
+            print("frequency samples: ", len(self.frequency))
+
+        elif self.extra_zero > 0:  # signal is affected by doppler effect: expanded, so we need to remove extra zeros
+            if self.previous_data != 3 and data != 3:  # no dati sporgenti
+                self.frequency = self.frequency[:-self.extra_zero]  # remove the extra zeros
+            elif self.previous_data == 3:  # dati sporgenti
+                if data == 0:
+                    self.frequency = self.frequency[:-2 * self.extra_zero]  # remove the extra zeros twice
+                elif data == 3:
+                    self.frequency = self.frequency[self.extra_zero:]  # remove the initial extra zeros
+                else:  # if the previous data was 11
+                    self.frequency = self.frequency[:-self.extra_zero]  # remove final the extra zeros
+                    self.frequency = self.frequency[self.extra_zero:]
+
+        print(f"data: {data} - frequency samples: {len(self.frequency)} - max frequency: {self.frequency[-1]}")
+        self.previous_data = data
+        return self.frequency, self.original_frequency
+
+    def generate_chirp(self, data):
+        if tf.v_relative != 0:  # signal is affected by doppler effect
+            if self.extra_zero > 0:  # signal is affected by doppler effect: compressed, so we need to add extra zeros
+                x = np.linspace(0, tf.T_frame_doppler, tf.sig_samples_doppler)
+                x = x[:len(self.frequency)]
+                self.signal = np.sin(2 * np.pi * self.frequency * (x - data * tf.t_slot))
+            elif self.extra_zero < 0:
+                self.signal = np.sin(2 * np.pi * self.frequency * (self.x - data * tf.t_slot))
+        else:
+            self.signal = np.sin(2 * np.pi * self.frequency * (self.x - data * tf.t_slot))
         return self.signal
 
     def send_signal(self, noise):
@@ -109,7 +143,7 @@ if __name__ == "__main__":
     noise = e_signal / SNR
 
     while i < len(data):
-        transmitter.generate_signal(transmitter.tm.timeInterval[data[i]])
+        transmitter.generate_signal(data[i])
         transmitter.send_signal(noise) # send signal with noise
         i += 1
 

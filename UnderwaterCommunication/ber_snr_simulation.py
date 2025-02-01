@@ -61,15 +61,39 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
         print("Slot peak decoded length: ", len(slot_peak_decoded))
         print("Peak density decoded length: ", len(peak_density_decoded))
 
-        for n in range(len(original_data)):
-            if original_data[n] != mean_peak_decoded[n]:
+        # calculate the number of errors
+        original_lenght = len(original_data)
+        mean_peak_length = len(mean_peak_decoded)
+        max_peak_length = len(max_peak_decoded)
+        slot_peak_length = len(slot_peak_decoded)
+        peak_density_length = len(peak_density_decoded)
+
+        for n in range(original_lenght):
+            if n >= mean_peak_length:
                 mean_peak_error += 1
-            if original_data[n] != max_peak_decoded[n]:
+            elif original_data[n] != mean_peak_decoded[n]:
+                mean_peak_error += 1
+            if n >= max_peak_length:
                 max_peak_error += 1
-            if original_data[n] != slot_peak_decoded[n]:
+            elif original_data[n] != max_peak_decoded[n]:
+                max_peak_error += 1
+            if n >= slot_peak_length:
                 slot_peak_error += 1
-            if original_data[n] != peak_density_decoded[n]:
+            elif original_data[n] != slot_peak_decoded[n]:
+                slot_peak_error += 1
+            if n >= peak_density_length:
                 peak_density_error += 1
+            elif original_data[n] != peak_density_decoded[n]:
+                peak_density_error += 1
+
+        if len(original_data) != len(mean_peak_decoded):
+            mean_peak_error += abs(len(original_data) - len(mean_peak_decoded))
+        if len(original_data) != len(max_peak_decoded):
+            max_peak_error += abs(len(original_data) - len(max_peak_decoded))
+        if len(original_data) != len(slot_peak_decoded):
+            slot_peak_error += abs(len(original_data) - len(slot_peak_decoded))
+        if len(original_data) != len(peak_density_decoded):
+            peak_density_error += abs(len(original_data) - len(peak_density_decoded))
 
         # append the ber to the list, if ber > 0.5, set it to 0.5
         ber_mean_peak.append( mean_peak_error/ params.num_bits if mean_peak_error / params.num_bits < 0.5 else 0.5)
