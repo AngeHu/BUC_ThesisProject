@@ -138,7 +138,7 @@ class Transmitter():
                 x = np.linspace(0, tf.T_frame_doppler, tf.sig_samples_doppler)
                 x = x[:len(self.frequency)]
                 self.signal = np.sin(2 * np.pi * self.frequency * (x - data * tf.t_slot))
-            elif self.extra_zero < 0:
+            elif self.extra_zero <= 0:
                 self.signal = np.sin(2 * np.pi * self.frequency * (self.x - data * tf.t_slot))
             self.original_signal = np.sin(2 * np.pi * self.original_frequency * (self.x - data * tf.t_slot))
         else:

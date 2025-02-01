@@ -18,7 +18,7 @@ SNR = 1  # rapporto segnale rumore
 
 # Doppler effect
 v_transmitter = 0 # positiva se si avvicina, negativa se si allontana
-v_receiver = 1000 # positiva se si allontana, negativa se si avvicina
+v_receiver = 2 # positiva se si allontana, negativa se si avvicina
 F_SAMPLING = 96000 # frequenza campionamento orginale
 T_FRAME = 0.1  # durata frame originale
 c = 1500 # velocità suono m/s
