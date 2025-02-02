@@ -84,7 +84,6 @@ class Channel:
         try:
             # Read 10 lines at a time until we get `tf.sig_samples` samples or EOF
             while len(signal) < tf.sig_samples:
-                print(len(signal))
                 # read batch of bytes - one value is 4 bytes
                 data = self.fifo.read(batch_size)
                 if not data:

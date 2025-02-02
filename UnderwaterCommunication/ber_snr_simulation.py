@@ -49,7 +49,7 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
 
         # load original data
         original_data = np.load(params.res_directory + 'data.npy')
-        # extract numbers from results files
+        # extract numbers from resfixed different output comparatorults files
         mean_peak_decoded = np.load(params.res_directory + 'mean_peak.npy')
         max_peak_decoded = np.load(params.res_directory + 'max_peak.npy')
         slot_peak_decoded = np.load(params.res_directory + 'slot_peak.npy')
@@ -112,9 +112,28 @@ if params.BER_SNR_SIMULATION:  # to run the simulation set BER_SNR_SIMULATION = 
     plt.ylim(None, 0.5)
     plt.xlabel("SNR [dB]")
     plt.ylabel("BER")
-    title = "BER vs SNR"+" - "+str(params.num_bits)+" bits"
+    title = "BER vs SNR" #+" - "+str(params.num_bits)+" bits"
     plt.title(title)
     plt.grid(True)
+
+    # Create text for the box
+    if params.v_transmitter == 0 and params.v_receiver == 0:
+        text = "No Doppler effect"
+    else:
+        text = f"Transmitter speed: {params.v_transmitter} m/s\nReceiver speed: {params.v_receiver} m/s\n"
+    data_text = (
+        text +
+        f"Relative speed: {params.v_relative} m/s\n"
+        f"Number of bits: {params.num_bits}"
+    )
+
+    ax = plt.gca()
+    ax.text(0.05, -0.25, data_text,
+            transform=ax.transAxes,
+            fontsize=10,
+            verticalalignment='top',
+            bbox=dict(facecolor='lightgray', alpha=0.7))
+
     plt.tight_layout()
     #plt.show()
     file_name = params.img_directory+'ber_snr'+str(params.num_bits)+'.png'

@@ -204,7 +204,7 @@ if __name__ == "__main__":
     try:
         while True:
             data = rc.read()
-            print("Data length: ", len(data))
+            #print("Data length: ", len(data))
             if data:
                 rc.decode_signal(data)
             else:

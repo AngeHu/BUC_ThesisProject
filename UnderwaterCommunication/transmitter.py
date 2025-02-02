@@ -75,7 +75,6 @@ class Transmitter():
         # if signal is affected by doppler effect, keep count of the number of bits sent
         self.previous_data = -1
         self.extra_zero = tf.sig_samples_doppler - tf.sig_samples
-        print("extra zero: ", self.extra_zero)
         self.last_frame = 0
 
     # must visualize 2 graphs: one for frequency and one for signal
@@ -88,9 +87,9 @@ class Transmitter():
         # adjust frequency samples if signal is affected by doppler effect
         if self.extra_zero < 0:  # signal is affected by doppler effect: compressed, so we need to add extra zeros
             # np.append(self.frequency, np.zeros(abs(self.extra_zero)))
-            print("extra zero: ", abs(self.extra_zero))
+            #print("extra zero: ", abs(self.extra_zero))
             self.frequency = np.pad(self.frequency, (0, abs(int(self.extra_zero))), 'constant', constant_values=0)
-            print("frequency samples: ", len(self.frequency))
+            #print("frequency samples: ", len(self.frequency))
 
         elif self.extra_zero > 0:  # signal is affected by doppler effect: expanded, so we need to remove extra zeros
             if self.previous_data != 3 and data != 3:  # no dati sporgenti
@@ -104,7 +103,7 @@ class Transmitter():
                     self.frequency = self.frequency[:-self.extra_zero]  # remove final the extra zeros
                     self.frequency = self.frequency[self.extra_zero:]
 
-        print(f"data: {data} - frequency samples: {len(self.frequency)} - max frequency: {self.frequency[-1]}")
+        # print(f"data: {data} - frequency samples: {len(self.frequency)} - max frequency: {self.frequency[-1]}")
         self.previous_data = data
         return self.frequency, self.original_frequency
 
@@ -114,7 +113,7 @@ class Transmitter():
                 x = np.linspace(0, tf.T_frame_doppler, tf.sig_samples_doppler)
                 x = x[:len(self.frequency)]
                 self.signal = np.sin(2 * np.pi * self.frequency * (x - data * tf.t_slot))
-            elif self.extra_zero < 0:
+            elif self.extra_zero <= 0:
                 self.signal = np.sin(2 * np.pi * self.frequency * (self.x - data * tf.t_slot))
         else:
             self.signal = np.sin(2 * np.pi * self.frequency * (self.x - data * tf.t_slot))
