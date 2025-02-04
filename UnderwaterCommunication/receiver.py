@@ -69,6 +69,7 @@ class Receiver:
         if not tf.BER_SNR_SIMULATION: print("Receiver ON")
         self.x = np.linspace(0, tf.T_FRAME, tf.sig_samples)
         self.correlation = []
+        self.amplitude_envelope = []
         self.mean_peak_decoded =np.array([], dtype=np.int8)  # data to decipher
         self.max_peak_decoded = np.array([], dtype=np.int8)  # data to decipher
         self.slot_peak_decoded = np.array([], dtype=np.int8)
@@ -84,7 +85,7 @@ class Receiver:
         x = np.linspace(0, 4*tf.T_FRAME, len(data))
         plot_function(x, data)
 
-    def plot_correlation(self, signal: np.array):
+    def plot_correlation(self, signal: np.array): # non viene usata
         print("Plotting correlation")
         global chirp_signal
         self.correlation = correlate(signal, chirp_signal, mode='full')
@@ -134,22 +135,22 @@ class Receiver:
         # filter and correlate signal
         if tf.f_max < tf.F_SAMPLING/2:
             filtered_signal = self.lowpass_filter(signal)
-            correlated_signal = correlate(filtered_signal, chirp_signal, mode='same')
+            self.correlation = correlate(filtered_signal, chirp_signal, mode='same')
         else:
-            correlated_signal = correlate(signal, chirp_signal, mode='same')
+            self.correlation = correlate(signal, chirp_signal, mode='same')
 
         # extract analytic signal and envelope
-        amplitude_envelope = np.abs(hilbert(correlated_signal))
+        self.amplitude_envelope = np.abs(hilbert(self.correlation))
 
         # thresholding
-        mean_corr = np.mean(amplitude_envelope)
-        corr_std = np.std(amplitude_envelope)
+        mean_corr = np.mean(self.amplitude_envelope)
+        corr_std = np.std(self.amplitude_envelope)
         threshold = mean_corr + 3 * corr_std # 3 sigma
-        peaks, _ = find_peaks(amplitude_envelope, height=threshold)
+        peaks, _ = find_peaks(self.amplitude_envelope, height=threshold)
 
         if peaks.size == 0:
             threshold = mean_corr + 0.5 * corr_std
-            peaks, _ = find_peaks(amplitude_envelope, height=threshold)
+            peaks, _ = find_peaks(self.amplitude_envelope, height=threshold)
 
         # media totale dei picchi
 
@@ -163,7 +164,7 @@ class Receiver:
                 self.mean_peak_decoded = np.append(self.mean_peak_decoded, lapse.data)
 
         # cerca picco massimo
-        max_peak_index = np.argmax(amplitude_envelope)
+        max_peak_index = np.argmax(self.amplitude_envelope)
         if max_peak_index is None:
             print("No max index peaks found", file=sys.stderr)
             return
@@ -175,7 +176,7 @@ class Receiver:
         mean_peaks = np.zeros(4)
         for i in range(4):
             peaks_slot = peaks[np.where((peaks >= i * tf.chirp_samples) & (peaks < (i + 1) * tf.chirp_samples))]
-            mean_peaks[i] = mean(amplitude_envelope, peaks_slot)
+            mean_peaks[i] = mean(self.amplitude_envelope, peaks_slot)
 
         max_peak = np.argmax(mean_peaks)
         if max_peak is None:
@@ -187,8 +188,8 @@ class Receiver:
 
         # disable plotting for BER/SNR simulation
         plt.figure()
-        plt.plot(t_frame, amplitude_envelope)
-        plt.plot(t_frame[peaks], amplitude_envelope[peaks], "x", color="red")
+        plt.plot(t_frame, self.amplitude_envelope)
+        plt.plot(t_frame[peaks], self.amplitude_envelope[peaks], "x", color="red")
         plt.title("Correlation with Chirp")
         plt.xlabel("Time [s]")
         plt.ylabel("Correlation")
@@ -204,7 +205,7 @@ class Receiver:
         # Calculate the time values for the current slot
         time_values = self.x + counter * tf.T_FRAME
         # Prepare data rows in bulk
-        rows = [[t, sig] for t, sig in zip(time_values, data)]
+        rows = [[t, sig, corr, ampl] for t, sig, corr, ampl in zip(time_values, data, self.correlation, self.amplitude_envelope)]
         # Append rows to the CSV file
         with open(filename, 'a', newline='') as file:
             writer = csv.writer(file)
@@ -215,13 +216,18 @@ if __name__ == "__main__":
     rc = Receiver()
     i = 0
     data = np.array([])
+
+    with open(animation_file, 'w') as file:
+        writer = csv.DictWriter(file, fieldnames=["time", "signal", "correlation"])
+        writer.writeheader()
+
     try:
         while True:
             data = rc.read()
             if data != []:
                 rc.decode_signal(data)
+                rc.save_to_csv(animation_file, i, data)
                 i += 1
-                # rc.save_to_csv(animation_file, i, data)
             else:
                 break
     # print error on stderr

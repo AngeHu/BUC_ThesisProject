@@ -108,8 +108,8 @@ def read_doppler_data(last_position, batch_size=BATCH_SIZE):
 
 
 # Set up the figure and axes for animation
-fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(8, 6))
-fig.suptitle("Underwater Acoustic Communication Simulation", fontsize=16)
+fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, num="Underwater Acoustic Communication Simulation", figsize=(8, 6))
+fig.suptitle("Transmitter", fontsize=16)
 fig.tight_layout()
 
 # Signal plot
