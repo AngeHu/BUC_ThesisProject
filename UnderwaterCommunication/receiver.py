@@ -202,11 +202,12 @@ if __name__ == "__main__":
     i = 0
     data = np.array([])
     try:
-        while True:
+        while i < (tf.num_bits/2):
             data = rc.read()
             #print("Data length: ", len(data))
             if data:
                 rc.decode_signal(data)
+                i += 1
             else:
                 break
     except Exception as e:
