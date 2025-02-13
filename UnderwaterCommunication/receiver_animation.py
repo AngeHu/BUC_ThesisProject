@@ -75,7 +75,7 @@ ax1.legend()
 ax2.set_title("Correlation")
 ax2.grid(True)
 ax2.set_xlim(0, 10)  # Initial x-axis limit
-ax2.set_ylim(-50, 200)
+ax2.set_ylim(0, 50)
 line2, = ax2.plot([], [], lw=2, label="Correlation", color='blue')
 ax2.set_xlabel("Time (s)")
 ax2.set_ylabel("Correlation")
@@ -103,6 +103,13 @@ def update(frame):
         end_time = time_data[-1]
         ax1.set_xlim(start_time, end_time)
         ax2.set_xlim(start_time, end_time)
+
+        max_signal  = max(signal_data, key = abs)
+        max_correlation = max(correlation_data, key = abs)
+        max_signal = max_signal + 0.1 * max_signal
+        max_correlation = max_correlation + 0.1 * max_correlation
+        ax1.set_ylim(-max_signal, max_signal)
+        ax2.set_ylim(0, max_correlation)
 
     return line1, line2
 

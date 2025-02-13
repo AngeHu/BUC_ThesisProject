@@ -7,6 +7,15 @@ import time
 import sys
 import csv
 from scipy.signal import chirp
+import random
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+import soundfile as sf
+import io
+import os
+import librosa
+import subprocess
+import multiprocessing
 
 #TODO: animare il segnale trasmesso senza effetto doppler!
 
@@ -39,37 +48,66 @@ def arrange_step(start, num, step = t_sampling):
     # return np.arange(start, start + (num-1) * step, step)
     return np.linspace(start, start + num * step, num, endpoint=False)  # Ensures exact num elements
 
+def run_script(script_name):
+    subprocess.run(["python3", script_name])
 
 # plot every 4*2 bits
-def plot_function(x, y_freq, y_sig):
-    figure, (ax1, ax2) = plt.subplots(2, 1)
-    freq, = ax1.plot(x, y_freq, color='g', label='Frequenza')  # Crea il grafico
-    sig, = ax2.plot(x, y_sig, color='r', label='Segnale')  # Crea il grafico
+def plot_function(x, y_sig, y_freq=[]):
+    # Check if frequency data is provided
+    plot_freq = len(y_freq) > 0
 
-    ax1.set_xlabel('Time(s)')  # Aggiunge un'etichetta all'asse x
-    ax1.set_ylabel('Frequenza')  # Aggiunge un'etichetta all'asse y1
-    ax2.set_xlabel('Time(s)')  # Aggiunge un'etichetta all'asse x
-    ax2.set_ylabel('Segnale')  # Aggiunge un'etichetta all'asse y2
-    ax1.set_xlim(0, tf.T_frame_doppler)
-    ax1.set_ylim(0, 500)
-    ax2.set_xlim(0, tf.T_frame_doppler)
-    ax2.set_ylim(-1, 1)
-    plt.grid(True)  # Aggiunge una griglia al grafico (opzionale)
-    plt.tight_layout() # Aggiusta il layout per fare spazio alle etichette
-    plt.show()  # Mostra il grafico
+    # Create subplots dynamically
+    if plot_freq:
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
+    else:
+        fig, ax2 = plt.subplots(1, 1, figsize=(10, 4))
+
+    ax2.set_title('Transmitted Signal')
+    # Always plot the signal
+    ax2.plot(x, y_sig, color='r', label='Signal')
+    ax2.set_xlabel('Time (s)')
+    ax2.set_ylabel('Signal')
+    ax2.set_xlim(0, tf.T_frame_doppler)  # Replace with your time limit
+    upper_lim = max(y_sig) + 0.1 * max(y_sig) if max(y_sig) < 1 else 1
+    print("upper limit: ", upper_lim)
+    ax2.set_ylim(-upper_lim, upper_lim)
+    ax2.grid(True)
+
+    # Plot frequency if data exists
+    if plot_freq:
+        ax1.plot(x, y_freq, color='g', label='Frequency')
+        ax1.set_ylabel('Frequency')
+        ax1.set_xlim(0, tf.T_frame_doppler)
+        ax1.set_ylim(0, 500)
+        ax1.grid(True)
+        ax1.set_xticklabels([])  # Remove redundant x-axis labels for top plot
+
+    plt.tight_layout()
+    plt.show()
 
 
 def encode_signal(data):
     encoded_signal = []
-    for i in range(0, len(data), 2):
-        if data[i] == 0 and data[i+1] == 0:
-            encoded_signal.append(0)
-        elif data[i] == 0 and data[i+1] == 1:
-            encoded_signal.append(1)
-        elif data[i] == 1 and data[i+1] == 1:
-            encoded_signal.append(2)
-        elif data[i] == 1 and data[i+1] == 0:
-            encoded_signal.append(3)
+    if tf.BIO_SIGNALS:
+        for i in data:
+            if i % 4 == 0:
+                encoded_signal.append(0)
+            elif i % 4 == 1:
+                encoded_signal.append(1)
+            elif i % 4 == 2:
+                encoded_signal.append(2)
+            elif i % 4 == 3:
+                encoded_signal.append(3)
+    else:
+        for i in range(0, len(data), 2):
+            if data[i] == 0 and data[i+1] == 0:
+                encoded_signal.append(0)
+            elif data[i] == 0 and data[i+1] == 1:
+                encoded_signal.append(1)
+            elif data[i] == 1 and data[i+1] == 1:
+                encoded_signal.append(2)
+            elif data[i] == 1 and data[i+1] == 0:
+                encoded_signal.append(3)
     if tf.DEBUG: print("Encoded signal: ", encoded_signal)
     return encoded_signal
 
@@ -88,6 +126,8 @@ class Transmitter():
         self.previous_data = -1
         self.extra_zero = tf.sig_samples_doppler - tf.sig_samples
         self.last_frame = 0
+        if tf.BIO_SIGNALS:
+            self.temp_files = dict()
 
     ### Generate the signal to be sent:
     # 1. Generate the frequency
@@ -145,6 +185,44 @@ class Transmitter():
             self.signal = np.sin(2 * np.pi * self.frequency * (self.x - data * tf.t_slot))
         return self.signal
 
+    def retrieve_signal(self, db_collection, data): # retrieve audio data from database
+        for i in data:
+            #check if exist already in temp_files
+            if i in self.temp_files:
+                continue
+            query = {"_id": int(i)}
+            result = db_collection.find_one(query)
+
+            if result and 'audio_data' in result:
+                file_path = self.save_to_tempfile(result['_id'], result['audio_data'])
+                self.temp_files[i] = file_path
+
+    def save_to_tempfile(self, file_id, audio_data):
+        os.makedirs("/tmp/transmitter_cache/audio", exist_ok=True)
+        file_path = f"/tmp/transmitter_cache/audio/{file_id}.flac"
+        with open(file_path, 'wb') as f:
+            f.write(audio_data)
+        return file_path
+
+    def cleanup(self):
+        # Deletes all temporary files after processing.
+        for file_path in self.temp_files:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"Deleted: {file_path}")
+
+    def generate_biosignal(self, data, audio_data, duration = 0.4): # data is slot number
+        file_path = self.temp_files[audio_data]
+        y, sr = librosa.load(file_path, sr=None)
+        self.signal = np.zeros(tf.sig_samples, dtype=np.float32)
+        self.frequency = np.zeros(tf.sig_samples, dtype=np.float32) # for animation purposes
+
+        start_idx = data * tf.chirp_samples
+        end_idx = start_idx + len(y)
+        self.signal[start_idx : end_idx] = y
+        e_signal = sum(self.signal**2) / tf.sig_samples
+        return e_signal
+
     def save_to_csv(self, counter, filename = animation_file):
         # Calculate the time values for the current slot
         time_values = self.x + counter * tf.T_FRAME
@@ -179,30 +257,41 @@ class Transmitter():
 
 
 if __name__ == "__main__":
-    print(tf.T_frame_doppler)
-    if tf.BER_SNR_SIMULATION:
-        # generate bit sequence
+
+    transmitter = Transmitter()
+
+    if tf.BIO_SIGNALS:
+        # connect to database
+        client = MongoClient(tf.uri, server_api=ServerApi('1'))
+        try:
+            client.admin.command('ping')
+            print("Pinged your deployment. You successfully connected to MongoDB!")
+        except Exception as e:
+            print(e)
+            exit(1)
+
+        database = client['dolphin_database']
+        collection = database['short_whistle_files']
+        collection_size = collection.count_documents({})
+        random.seed(tf.seed)
+        data = [random.randint(1, collection_size) for _ in range(int(tf.num_bits / 2))]
+        transmitter.retrieve_signal(collection, data)
+    else:
         data = np.random.randint(0, 2, tf.num_bits)
-        print(data)
+    print("Data:", data)
+
+
+    if tf.BER_SNR_SIMULATION:
         SNR = float(sys.argv[1])
         # turn snr to linear scale
         SNR = 10 ** (SNR / 10)
     else:
-        #file = open("test/test1.txt", 'r')
-        # read data from file adn put in a string
-        #read_data = file.read()
-        #data = [int(char) for char in read_data]
-        data = np.random.randint(0, 2, tf.num_bits)
-        print("Data: ", data)
-        SNR = tf.SNR
-    tm = tf.TimeFrame()
-    transmitter = Transmitter()
+        SNR = 10 ** (tf.SNR / 10)
 
     i = 0
-    data = encode_signal(data)
-    frq = np.array([])
-    sig = np.array([])
+    data_slot = encode_signal(data)
 
+    # create animation file where to save values
     with open(animation_file, 'w') as file:
         writer = csv.DictWriter(file, fieldnames=["time", "signal", "frequency"])
         writer.writeheader()
@@ -211,20 +300,33 @@ if __name__ == "__main__":
         writer = csv.DictWriter(file, fieldnames=["time", "signal", "frequency"])
         writer.writeheader()
 
-    while i < len(data):
-        transmitter.generate_signal(data[i])
-        transmitter.send_signal(e_signal / SNR) # send signal with noise
-        # write to file for animation
-        transmitter.save_to_csv(i)
-        transmitter.save_to_csv_doppler()
-        i += 1
-        # plot_function(transmitter.x, transmitter.frequency, transmitter.signal)
+    animation = multiprocessing.Process(target=run_script, args=("./animation.py",))
+    animation.start()
 
-    time.sleep(1) # wait for receiver to finish
+    while i < len(data):
+        if tf.BIO_SIGNALS:
+            e = transmitter.generate_biosignal(data_slot[i], data[i])
+            transmitter.send_signal(e / SNR)
+            transmitter.save_to_csv(i)
+            if tf.PLOT: plot_function(transmitter.x, transmitter.signal)
+        else:
+            transmitter.generate_signal(data_slot[i])
+            transmitter.send_signal(e_signal / SNR) # send signal with noise
+            # write to file for animation
+            transmitter.save_to_csv(i)
+            transmitter.save_to_csv_doppler()
+            if tf.PLOT: plot_function(transmitter.x, transmitter.signal, transmitter.frequency)
+        i += 1
+
+    time.sleep(1) # wait for receiver to finish receiving
     transmitter.channel.close()
 
     if not tf.BER_SNR_SIMULATION:
         print("Transmitter OFF")
 
+    if tf.BIO_SIGNALS:
+        transmitter.cleanup()
+
+    animation.join()
 
 

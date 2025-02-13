@@ -13,6 +13,13 @@ from scipy.fft import fftshift
 from scipy.signal import butter, lfilter, find_peaks
 import sys
 import csv
+from pymongo import MongoClient
+from pymongo.server_api import ServerApi
+import random
+import os
+import librosa
+import subprocess
+import multiprocessing
 
 animation_file = "./animation/receiver.csv"
 
@@ -33,6 +40,7 @@ if tf.DEBUG:
 
     atexit.register(save_profile)
 
+
 SAVE_IMG = tf.SAVE_IMG
 img_directory = tf.img_directory
 METHOD = 1 if tf.MAX_PEAK else 2 if tf.MEAN_PEAK else 3 if tf.SLOT_PEAK else 0
@@ -40,14 +48,19 @@ METHOD = 1 if tf.MAX_PEAK else 2 if tf.MEAN_PEAK else 3 if tf.SLOT_PEAK else 0
 # increase agg.path.chunksize
 plt.rcParams['agg.path.chunksize'] = 10000
 
+# chirp signal
 t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples) # vettore tempo
-t_frame = np.linspace(0, tf.T_FRAME, tf.sig_samples) # vettore tempo
 chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
+
+t_frame = np.linspace(0, tf.T_FRAME, tf.sig_samples) # vettore tempo
 
 def mean(x, indices):
     if indices.size == 0:
         return 0
     return np.mean(x[indices])
+
+def run_script(script_name):
+    subprocess.run(["python3", script_name])
 
 def plot_function(x, y_sig):
     if(len(x) != len(y_sig)):
@@ -74,6 +87,7 @@ class Receiver:
         self.max_peak_decoded = np.array([], dtype=np.int8)  # data to decipher
         self.slot_peak_decoded = np.array([], dtype=np.int8)
         self.tm = tf.TimeFrame()
+        self.temp_files = dict()
 
 
     def read(self):
@@ -103,12 +117,7 @@ class Receiver:
         print("Signal length: ", len(signal))
         f, t, Sxx = spectrogram(signal, fs=tf.F_SAMPLING, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
                                 nfft=2048)
-        # f, t, Sxx = stft(signal, fs=tf.sig_samples, nperseg=256)
-        # Sxx_magnitude = np.abs(Sxx)
-        # plt.pcolormesh(t, f, Sxx_magnitude)
-        # plt.ylabel('Frequency [Hz]')
-        # plt.xlabel('Time [sec]')
-        # plt.show()
+
         plt.pcolormesh(t, f, 10 * np.log10(Sxx), shading='gouraud', cmap="viridis", vmin=-150, vmax=0)
         # plt.pcolormesh(t, f, Sxx_magnitude, shading='gouraud', cmap="viridis", vmin=-150, vmax=0)
         plt.colorbar(label="Power/Frequency (dB/Hz)")
@@ -118,6 +127,13 @@ class Receiver:
         plt.tight_layout()  # Adjust layout to make room for the labels
         plt.show()
 
+    def compute_power(self, signal: np.array):
+        print("Computing power")
+        f, t, Sxx = spectrogram(signal, fs=tf.F_SAMPLING, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
+                                nfft=2048)
+        power = np.sum(Sxx, axis=0)
+        print("Power: ", power)
+
     # decode signal
     def lowpass_filter(self, data, fs=tf.F_SAMPLING, lowcut=tf.f_max, order=8):
         b, a = butter(order, lowcut, fs=fs, btype='low')
@@ -125,19 +141,25 @@ class Receiver:
         filtered_data = lfilter(b, a, data)
         return filtered_data
 
-    def decode_signal(self, signal):
+    def decode_signal(self, signal : np.array, expected_signal=None):
         global chirp_signal
 
-        if not signal:
+        if signal.size == 0:
             print("Empty signal", file=sys.stderr)
             return None
 
         # filter and correlate signal
+        if tf.BIO_SIGNALS:
+            file_path = self.temp_files[expected_signal]
+            correlation_signal, sr = librosa.load(file_path, sr=None)
+        else:
+            correlation_signal = chirp_signal
+
         if tf.f_max < tf.F_SAMPLING/2:
             filtered_signal = self.lowpass_filter(signal)
-            self.correlation = correlate(filtered_signal, chirp_signal, mode='same')
+            self.correlation = correlate(filtered_signal, correlation_signal, mode='same')
         else:
-            self.correlation = correlate(signal, chirp_signal, mode='same')
+            self.correlation = correlate(signal, correlation_signal, mode='same')
 
         # extract analytic signal and envelope
         self.amplitude_envelope = np.abs(hilbert(self.correlation))
@@ -184,22 +206,23 @@ class Receiver:
             return
         self.slot_peak_decoded = np.append(self.slot_peak_decoded, self.tm.timeInterval[max_peak].data)
 
-        # plot correlation
-
         # disable plotting for BER/SNR simulation
-        plt.figure()
-        plt.plot(t_frame, self.amplitude_envelope)
-        plt.plot(t_frame[peaks], self.amplitude_envelope[peaks], "x", color="red")
-        plt.title("Correlation with Chirp")
-        plt.xlabel("Time [s]")
-        plt.ylabel("Correlation")
-        plt.grid(True)
-        if SAVE_IMG:
-            timestamp = time.time()
-            timestamp = str(timestamp).replace(".", "")
-            plt.savefig(img_directory + timestamp + ".png")
-        else:
-            plt.show()
+        if tf.BER_SNR_SIMULATION:
+            return
+        if tf.PLOT:
+            plt.figure()
+            plt.plot(t_frame, self.amplitude_envelope)
+            plt.plot(t_frame[peaks], self.amplitude_envelope[peaks], "x", color="red")
+            plt.title("Correlation with Chirp")
+            plt.xlabel("Time [s]")
+            plt.ylabel("Correlation")
+            plt.grid(True)
+            if SAVE_IMG:
+                timestamp = time.time()
+                timestamp = str(timestamp).replace(".", "")
+                plt.savefig(img_directory + timestamp + ".png")
+            else:
+                plt.show()
 
     def save_to_csv(self, filename, counter, data):
         # Calculate the time values for the current slot
@@ -212,21 +235,72 @@ class Receiver:
             writer.writerows(rows)
             file.flush()
 
+    def retrieve_signal(self, db_collection, data): # retrieve audio data from database
+        for i in data:
+            #check if exist already in temp_files
+            if i in self.temp_files:
+                continue
+            query = {"_id": int(i)}
+            result = db_collection.find_one(query)
+
+            if result and 'audio_data' in result:
+                file_path = self.save_to_tempfile(result['_id'], result['audio_data'])
+                self.temp_files[i] = file_path
+
+    def save_to_tempfile(self, file_id, audio_data):
+        os.makedirs("/tmp/receiver_cache/audio", exist_ok=True)
+        file_path = f"/tmp/receiver_cache/audio/{file_id}.flac"
+        with open(file_path, 'wb') as f:
+            f.write(audio_data)
+        return file_path
+
+    def cleanup(self):
+        # Deletes all temporary files after processing.
+        for file_path in self.temp_files:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"Deleted: {file_path}")
+
 if __name__ == "__main__":
     rc = Receiver()
     i = 0
     data = np.array([])
 
+    if tf.BIO_SIGNALS:
+        # connect to database
+        client = MongoClient(tf.uri, server_api=ServerApi('1'))
+        try:
+            client.admin.command('ping')
+            print("Pinged your deployment. You successfully connected to MongoDB!")
+        except Exception as e:
+            print(e)
+            exit(1)
+        database = client['dolphin_database']
+        collection = database['short_whistle_files']
+        collection_size = collection.count_documents({})
+        random.seed(tf.seed)
+        expected_data = [random.randint(1, collection_size) for _ in range(int(tf.num_bits / 2))]
+        print("Expected data: ", expected_data)
+        rc.retrieve_signal(collection, expected_data)
+
+
     with open(animation_file, 'w') as file:
         writer = csv.DictWriter(file, fieldnames=["time", "signal", "correlation"])
         writer.writeheader()
 
+    animation = multiprocessing.Process(target=run_script, args=("./receiver_animation.py",))
+    animation.start()
+
     try:
-        while True:
-            data = rc.read()
-            if data != []:
-                rc.decode_signal(data)
+        while i < int(tf.num_bits/2): # or while True: to receive indefinitely
+            data = np.array(rc.read())
+            if data.size > 0:
+                if tf.BIO_SIGNALS:
+                    rc.decode_signal(data, expected_data[i])
+                else:
+                    rc.decode_signal(data)
                 rc.save_to_csv(animation_file, i, data)
+                if tf.PLOT: rc.plot_spectrogram(data)
                 i += 1
             else:
                 break
@@ -242,4 +316,6 @@ if __name__ == "__main__":
         print(rc.max_peak_decoded)
         if not tf.BER_SNR_SIMULATION:
             print("Receiver OFF")
-        exit(0)
+        if tf.BIO_SIGNALS:
+            rc.cleanup()
+        animation.join()
