@@ -75,8 +75,6 @@ class Period:
         self.end = end
         self.data = data
 
-
-class TimeFrame:
     def __init__(self):
         # intervallo di 2.5 sec
 
