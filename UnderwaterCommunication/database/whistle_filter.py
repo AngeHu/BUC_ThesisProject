@@ -11,6 +11,7 @@ import noisereduce as nr
 from dotenv import load_dotenv
 
 load_dotenv()
+TAGGING_CSV = os.getenv("TAGGING_CSV")
 SOURCE_PATH = os.getenv("SOURCE_PATH")
 DESTINATION_PATH = os.getenv("SHORT_WHISTLE_PATH")
 
@@ -140,4 +141,4 @@ def process_csv(csv_file, audio_dir):
 if __name__ == "__main__":
     os.makedirs(destination_path, exist_ok=True)
     os.makedirs(destination_path+"/original", exist_ok=True)
-    process_csv("../test/Tagging.csv", source_path)
+    process_csv(TAGGING_CSV, source_path)

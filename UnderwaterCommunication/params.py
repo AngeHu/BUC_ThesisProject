@@ -8,12 +8,17 @@ PASSWORD = os.getenv("DB_PASSWORD")
 # debug e ber/snr simulation non possono essere contemporaneamente attivi
 DEBUG = False
 BER_SNR_SIMULATION = False
+if DEBUG: # se debug è attivo, non posso fare la simulazione di ber/snr
+    BER_SNR_SIMULATION = False
+if BER_SNR_SIMULATION: # se la simulazione di ber/snr è attiva, non posso fare il debug
+    DEBUG = False
 BIO_SIGNALS = True
-SAVE_IMG = False
-PLOT = False
-ANIMATION = False
+SAVE_IMG = False # salva le immagini
+PLOT = False # mostra i grafici
+ANIMATION = False # mostra l'animazione
 
 # chirp decoding - only one of the two can be active
+### Not implemented yet
 MAX_PEAK = False # if false, use MEAN_PEAK
 MEAN_PEAK = False
 SLOT_PEAK = True
