@@ -2,8 +2,8 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-USERNAME = os.getenv("USERNAME")
-PASSWORD = os.getenv("PASSWORD")
+USERNAME = os.getenv("DB_USERNAME")
+PASSWORD = os.getenv("DB_PASSWORD")
 
 # debug e ber/snr simulation non possono essere contemporaneamente attivi
 DEBUG = False

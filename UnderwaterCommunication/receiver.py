@@ -21,6 +21,7 @@ import librosa
 import subprocess
 import multiprocessing
 
+os.makedirs("./animation", exist_ok=True)
 animation_file = "./animation/receiver.csv"
 
 if tf.DEBUG:
@@ -228,7 +229,7 @@ class Receiver:
         # Calculate the time values for the current slot
         time_values = self.x + counter * tf.T_FRAME
         # Prepare data rows in bulk
-        rows = [[t, sig, corr, ampl] for t, sig, corr, ampl in zip(time_values, data, self.correlation, self.amplitude_envelope)]
+        rows = [[t, sig, corr] for t, sig, corr in zip(time_values, data, self.amplitude_envelope)]
         # Append rows to the CSV file
         with open(filename, 'a', newline='') as file:
             writer = csv.writer(file)
@@ -268,6 +269,7 @@ if __name__ == "__main__":
 
     if tf.BIO_SIGNALS:
         # connect to database
+        print(tf.uri)
         client = MongoClient(tf.uri, server_api=ServerApi('1'))
         try:
             client.admin.command('ping')

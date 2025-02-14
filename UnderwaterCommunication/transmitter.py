@@ -37,6 +37,7 @@ if tf.DEBUG:
     atexit.register(save_profile)
 
 # global variables
+os.makedirs("./animation", exist_ok=True)
 animation_file = "./animation/transmitter.csv"
 doppler_animation_file = "./animation/transmitter_doppler.csv"
 t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples_doppler) # vettore tempo

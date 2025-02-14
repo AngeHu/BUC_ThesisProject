@@ -3,31 +3,23 @@ import librosa.display
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import sys
 import os
 import gc
 from scipy.signal import butter, lfilter
 import soundfile as sf
 import noisereduce as nr
+from dotenv import load_dotenv
 
-absolute_path = "/media/angela/HIKVISION/Informatica/Thesis"
-destination_path = "/media/angela/HIKVISION/Informatica/Thesis/whistle"
+load_dotenv()
+SOURCE_PATH = os.getenv("SOURCE_PATH")
+DESTINATION_PATH = os.getenv("SHORT_WHISTLE_PATH")
+
+source_path = SOURCE_PATH
+destination_path = DESTINATION_PATH
 noise_duration = 7
 counter = 1
 
 save = True
-
-def trim_flac_librosa(input_path, output_dir, start_sec, end_sec):
-    # Load audio data and sample rate
-    y, sr = librosa.load(input_path, sr=None, offset=start_sec, duration=end_sec - start_sec)
-
-    # Create output directory
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Save trimmed audio
-    output_path = os.path.join(output_dir, "trimmed_librosa.flac")
-    sf.write(output_path, y, sr, subtype='PCM_24')  # FLAC with 24-bit depth
-    return output_path
 
 def high_pass_filter(y, sr, cutoff=500):
     # Design a high-pass filter
@@ -148,4 +140,4 @@ def process_csv(csv_file, audio_dir):
 if __name__ == "__main__":
     os.makedirs(destination_path, exist_ok=True)
     os.makedirs(destination_path+"/original", exist_ok=True)
-    process_csv("../test/Tagging.csv", absolute_path)
+    process_csv("../test/Tagging.csv", source_path)

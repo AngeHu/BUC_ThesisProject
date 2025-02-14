@@ -5,8 +5,9 @@ import librosa
 from dotenv import load_dotenv
 
 load_dotenv()
-USERNAME = os.getenv("USERNAME")
-PASSWORD = os.getenv("PASSWORD")
+USERNAME = os.getenv("DB_USERNAME")
+PASSWORD = os.getenv("DB_PASSWORD")
+AUDIO_PATH = os.getenv("SHORT_WHISTLE_PATH")
 
 uri = f"mongodb+srv://{USERNAME}:{PASSWORD}@dolphincleanaudio.q2bsd.mongodb.net/?retryWrites=true&w=majority&appName=DolphinCleanAudio"
 
@@ -21,7 +22,7 @@ except Exception as e:
     print(e)
 
 
-audio_dir = "/media/angela/HIKVISION/Informatica/Thesis/short_whistle"
+audio_dir = AUDIO_PATH
 count = 1
 # Upload each FLAC file
 

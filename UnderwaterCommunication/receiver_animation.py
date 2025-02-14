@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib.animation import FuncAnimation
@@ -5,12 +6,14 @@ import params
 import traceback
 matplotlib.use('TkAgg')
 
+NUM_DISPAYED_FRAMES = 2  # Number of frames to display in animation window
 BATCH_SIZE = 800  # Number of new rows to read from the CSV
-FRAME_SIZE = 4*params.sig_samples  # Maximum number of data points to display
+FRAME_SIZE = NUM_DISPAYED_FRAMES*params.sig_samples  # Maximum number of data points to display
 INTERVAL = 1 # Milliseconds between updates
 # Global data arrays
 time_data, signal_data, correlation_data = [], [], []
 last_position = 0  # Track the last read position in the CSV
+os.makedirs("animation", exist_ok=True)
 receiver_file = "./animation/receiver.csv"
 
 # Function to read new rows from the CSV
@@ -35,7 +38,7 @@ def read_new_data(last_position, batch_size=BATCH_SIZE):
         try:
             time_data.extend([float(row[0]) for row in new_data])
             signal_data.extend([float(row[1]) for row in new_data])
-            correlation_data.extend([float(row[3]) for row in new_data])
+            correlation_data.extend([float(row[2]) for row in new_data])
         except (ValueError, IndexError) as e:
             print("Malformed data detected and skipped.")
             print("Detailed Error Information:")
@@ -53,6 +56,7 @@ def read_new_data(last_position, batch_size=BATCH_SIZE):
         if len(time_data) > FRAME_SIZE:
             time_data[:] = time_data[-FRAME_SIZE:]
             signal_data[:] = signal_data[-FRAME_SIZE:]
+            correlation_data[:] = correlation_data[-FRAME_SIZE:]
 
     return last_position
 

@@ -2,12 +2,14 @@ import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib.animation import FuncAnimation
 import params
+import os
 import traceback
 matplotlib.use('TkAgg')
 
-BATCH_SIZE = 800  # Number of new rows to read from the CSV
-FRAME_SIZE = 4*params.sig_samples  # Maximum number of data points to display
-FRAME_SIZE_DOPPLER = 4*params.sig_samples_doppler  # Maximum number of data points to display
+NUM_DISPLAYED_FRAMES = 2 # Number of frames to display in animation window
+BATCH_SIZE = 800 # Number of new rows to read from the CSV
+FRAME_SIZE = NUM_DISPLAYED_FRAMES*params.sig_samples  # Maximum number of data points to display
+FRAME_SIZE_DOPPLER = NUM_DISPLAYED_FRAMES*params.sig_samples_doppler  # Maximum number of data points to display
 INTERVAL = 1 # Milliseconds between updates
 # Global data arrays
 time_data, signal_data, frequency_data = [], [], []
@@ -16,6 +18,7 @@ transmitter_last_position = 0  # Track the last read position in the CSV
 doppler_time, doppler_signal, doppler_frequency = [], [], []
 doppler_last_position = 0  # Track the last read position in the CSV
 
+os.makedirs("animation", exist_ok=True)
 transmitter_file = "./animation/transmitter.csv"
 doppler_file = "./animation/transmitter_doppler.csv"
 
@@ -184,6 +187,8 @@ def update(frame):
         if params.BIO_SIGNALS:
             max_signal = max(signal_data, key=abs)
             max_signal = max_signal + 0.1 * max_signal
+            if max_signal == 0:
+                max_signal = 1
             ax1.set_ylim(-max_signal, max_signal)
         ax1.set_xlim(start_time, end_time)
         ax2.set_xlim(start_time, end_time)
