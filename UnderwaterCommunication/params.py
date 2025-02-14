@@ -1,4 +1,9 @@
-#TODO: aggiustare frequenza minima e massima a 18k e 38k
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+USERNAME = os.getenv("USERNAME")
+PASSWORD = os.getenv("PASSWORD")
 
 # debug e ber/snr simulation non possono essere contemporaneamente attivi
 DEBUG = False
@@ -6,6 +11,7 @@ BER_SNR_SIMULATION = False
 BIO_SIGNALS = True
 SAVE_IMG = False
 PLOT = False
+ANIMATION = False
 
 # chirp decoding - only one of the two can be active
 MAX_PEAK = False # if false, use MEAN_PEAK
@@ -13,12 +19,12 @@ MEAN_PEAK = False
 SLOT_PEAK = True
 
 # ber/snr simulation parameters
-num_bits = 4 # Number of bits to transmit
+num_bits = 32 # Number of bits to transmit
 img_directory = "./img/slot_peak/"  # directory
 
 # MongoDB
 seed = 42
-uri = "mongodb+srv://Simulator:Simulator@dolphincleanaudio.q2bsd.mongodb.net/?retryWrites=true&w=majority&appName=DolphinCleanAudio"
+uri = f"mongodb+srv://{USERNAME}:{PASSWORD}@dolphincleanaudio.q2bsd.mongodb.net/?retryWrites=true&w=majority&appName=DolphinCleanAudio"
 
 
 SNR = -20  # rapporto segnale rumore

@@ -206,7 +206,7 @@ class Transmitter():
 
     def cleanup(self):
         # Deletes all temporary files after processing.
-        for file_path in self.temp_files:
+        for file_path in self.temp_files.values():
             if os.path.exists(file_path):
                 os.remove(file_path)
                 print(f"Deleted: {file_path}")
@@ -230,7 +230,6 @@ class Transmitter():
         if tf.v_relative != 0:
             rows = [[t, sig, freq] for t, sig, freq in zip(time_values, self.original_signal, self.original_frequency)]
         else:
-            print(f"signal samples: {len(self.signal)}")
             rows = [[t, sig, freq] for t, sig, freq in zip(time_values, self.signal, self.frequency)]
         # Append rows to the CSV file
         with open(filename, 'a', newline='') as file:
@@ -300,8 +299,9 @@ if __name__ == "__main__":
         writer = csv.DictWriter(file, fieldnames=["time", "signal", "frequency"])
         writer.writeheader()
 
-    animation = multiprocessing.Process(target=run_script, args=("./animation.py",))
-    animation.start()
+    if tf.ANIMATION:
+        animation = multiprocessing.Process(target=run_script, args=("./animation.py",))
+        animation.start()
 
     while i < len(data):
         if tf.BIO_SIGNALS:
@@ -327,6 +327,6 @@ if __name__ == "__main__":
     if tf.BIO_SIGNALS:
         transmitter.cleanup()
 
-    animation.join()
+    if tf.ANIMATION: animation.join()
 
 

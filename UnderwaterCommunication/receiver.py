@@ -256,7 +256,7 @@ class Receiver:
 
     def cleanup(self):
         # Deletes all temporary files after processing.
-        for file_path in self.temp_files:
+        for file_path in self.temp_files.values():
             if os.path.exists(file_path):
                 os.remove(file_path)
                 print(f"Deleted: {file_path}")
@@ -288,8 +288,9 @@ if __name__ == "__main__":
         writer = csv.DictWriter(file, fieldnames=["time", "signal", "correlation"])
         writer.writeheader()
 
-    animation = multiprocessing.Process(target=run_script, args=("./receiver_animation.py",))
-    animation.start()
+    if tf.ANIMATION:
+        animation = multiprocessing.Process(target=run_script, args=("./receiver_animation.py",))
+        animation.start()
 
     try:
         while i < int(tf.num_bits/2): # or while True: to receive indefinitely
@@ -318,4 +319,4 @@ if __name__ == "__main__":
             print("Receiver OFF")
         if tf.BIO_SIGNALS:
             rc.cleanup()
-        animation.join()
+        if tf.ANIMATION: animation.join()

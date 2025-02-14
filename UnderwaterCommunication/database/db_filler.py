@@ -2,8 +2,13 @@ import os
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import librosa
+from dotenv import load_dotenv
 
-uri = "mongodb+srv://Simulator:Simulator@dolphincleanaudio.q2bsd.mongodb.net/?retryWrites=true&w=majority&appName=DolphinCleanAudio"
+load_dotenv()
+USERNAME = os.getenv("USERNAME")
+PASSWORD = os.getenv("PASSWORD")
+
+uri = f"mongodb+srv://{USERNAME}:{PASSWORD}@dolphincleanaudio.q2bsd.mongodb.net/?retryWrites=true&w=majority&appName=DolphinCleanAudio"
 
 # Create a new client and connect to the server
 client = MongoClient(uri, server_api=ServerApi('1'))
