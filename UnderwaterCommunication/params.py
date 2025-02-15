@@ -75,13 +75,14 @@ class Period:
         self.end = end
         self.data = data
 
+class TimeFrame:
     def __init__(self):
         # intervallo di 2.5 sec
 
         self.lapse1 = Period(0, 1, [0, 0])
-        self.lapse2 = Period(1, 2 , [0, 1])
-        self.lapse3 = Period(2 , 3 , [1, 1])
-        self.lapse4 = Period(3 , 4 , [1, 0])
+        self.lapse2 = Period(1, 2, [0, 1])
+        self.lapse3 = Period(2, 3, [1, 1])
+        self.lapse4 = Period(3, 4, [1, 0])
         self.timeInterval = [self.lapse1, self.lapse2, self.lapse3, self.lapse4]
 
         self.slot = [0, 1, 2, 3]
