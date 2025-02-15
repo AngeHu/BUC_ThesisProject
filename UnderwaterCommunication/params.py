@@ -1,31 +1,55 @@
-#TODO: aggiustare frequenza minima e massima a 18k e 38k
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+USERNAME = os.getenv("DB_USERNAME")
+PASSWORD = os.getenv("DB_PASSWORD")
 
 # debug e ber/snr simulation non possono essere contemporaneamente attivi
 DEBUG = False
 BER_SNR_SIMULATION = True
-SAVE_IMG = True
+if DEBUG: # se debug è attivo, non posso fare la simulazione di ber/snr
+    BER_SNR_SIMULATION = False
+if BER_SNR_SIMULATION: # se la simulazione di ber/snr è attiva, non posso fare il debug
+    DEBUG = False
+BIO_SIGNALS = True
+SAVE_IMG = False # salva le immagini
+PLOT = False # mostra i grafici
+ANIMATION = False # mostra l'animazione
 
 # chirp decoding - only one of the two can be active
+### Not implemented yet
 MAX_PEAK = False # if false, use MEAN_PEAK
 MEAN_PEAK = False
 SLOT_PEAK = True
 
 # ber/snr simulation parameters
 num_bits = 1000000 # Number of bits to transmit
-img_directory = "./img/slot_peak/"  # directory
+img_directory = "./img/whistles/"  # directory
 res_directory = "./res/"  # directory
 
-SNR = 1  # rapporto segnale rumore
+# MongoDB
+seed = 42
+uri = f"mongodb+srv://{USERNAME}:{PASSWORD}@dolphincleanaudio.q2bsd.mongodb.net/?retryWrites=true&w=majority&appName=DolphinCleanAudio"
+
+
+SNR = -20  # rapporto segnale rumore
 
 # Doppler effect
-v_transmitter = 0 # positiva se si avvicina, negativa se si allontana
-v_receiver = 2 # positiva se si allontana, negativa se si avvicina
-F_SAMPLING = 96000 # frequenza campionamento orginale
-T_FRAME = 0.1  # durata frame originale
-c = 1500 # velocità suono m/s
-T_SAMPLING = 1/F_SAMPLING # periodo campionamento
+v_transmitter = 0 # positive if moving closer, negative if moving away
+v_receiver = 0 # positive if moving away, negative if moving closer
+F_SAMPLING = 96000 # original sampling frequency
+if BIO_SIGNALS:
+    T_FRAME = 1.6  # each slot is 0.4 sec
+    v_transmitter = 0  # positive if moving closer, negative if moving away
+    v_receiver = 0  # positive if moving away, negative if moving closer
+else:
+    T_FRAME = 0.1  # arbiitrary choice
+c = 1500  # speed of sound m/s in water
+T_SAMPLING = 1/F_SAMPLING  # sampling period
 
-v_relative = v_receiver - v_transmitter # velocità relativa m/s
+v_relative = v_receiver - v_transmitter  # relative velocity
+
 scaling_factor = (c - v_receiver) / (c - v_transmitter)
 f_min = 18000 # frequenza minima
 f_max = 34000 # frequenza massima
@@ -52,15 +76,14 @@ class Period:
         self.end = end
         self.data = data
 
-
 class TimeFrame:
     def __init__(self):
         # intervallo di 2.5 sec
 
         self.lapse1 = Period(0, 1, [0, 0])
-        self.lapse2 = Period(1, 2 , [0, 1])
-        self.lapse3 = Period(2 , 3 , [1, 1])
-        self.lapse4 = Period(3 , 4 , [1, 0])
+        self.lapse2 = Period(1, 2, [0, 1])
+        self.lapse3 = Period(2, 3, [1, 1])
+        self.lapse4 = Period(3, 4, [1, 0])
         self.timeInterval = [self.lapse1, self.lapse2, self.lapse3, self.lapse4]
 
         self.slot = [0, 1, 2, 3]

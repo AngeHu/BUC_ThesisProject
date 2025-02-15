@@ -12,6 +12,11 @@ from scipy.signal import chirp, spectrogram, correlate, stft, hilbert
 from scipy.fft import fftshift
 from scipy.signal import butter, lfilter, find_peaks
 import sys
+import librosa
+import os
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+import random
 
 if tf.DEBUG:
     import cProfile
@@ -71,6 +76,8 @@ class Receiver:
         self.max_peak_decoded = []
         self.slot_peak_decoded = []
         self.peak_density_decoded = []
+        self.temp_files = dict()
+        self.amplitude_envelope = []
 
 
     def read(self):
@@ -127,28 +134,39 @@ class Receiver:
         filtered_data = lfilter(b, a, data)
         return filtered_data
 
-    def decode_signal(self, signal, method=0, sigma=2):
+    def decode_signal(self, signal : np.array, expected_signal=None):
         global chirp_signal
 
-        if not signal:
+        if signal.size == 0:
             print("Empty signal", file=sys.stderr)
             return None
 
         # filter and correlate signal
-        filtered_signal = self.lowpass_filter(signal)
-        correlated_signal = correlate(filtered_signal, chirp_signal, mode='same')
+        if tf.BIO_SIGNALS:
+            file_path = self.temp_files[expected_signal]
+            correlation_signal, sr = librosa.load(file_path, sr=None)
+        else:
+            correlation_signal = chirp_signal
+
+        if tf.f_max < tf.F_SAMPLING/2 and not tf.BIO_SIGNALS:
+            filtered_signal = self.lowpass_filter(signal)
+            self.correlation = correlate(filtered_signal, correlation_signal, mode='same')
+        else:
+            self.correlation = correlate(signal, correlation_signal, mode='same')
+
         # extract analytic signal and envelope
-        amplitude_envelope = np.abs(hilbert(correlated_signal))
+        self.amplitude_envelope = np.abs(hilbert(self.correlation))
 
         # thresholding
-        mean_corr = np.mean(amplitude_envelope)
-        corr_std = np.std(amplitude_envelope)
-        threshold = mean_corr + 3 * corr_std  # 3 sigma
-        peaks, _ = find_peaks(amplitude_envelope, height=threshold)
+        mean_corr = np.mean(self.amplitude_envelope)
+        corr_std = np.std(self.amplitude_envelope)
+        threshold = mean_corr + 3 * corr_std # 3 sigma
+        peaks, _ = find_peaks(self.amplitude_envelope, height=threshold)
+
 
         if peaks.size == 0:
-            threshold = np.max(amplitude_envelope) * 0.5  # Set to 50% of the maximum value
-            peaks, _ = find_peaks(amplitude_envelope, height=threshold)
+            threshold = np.max(self.amplitude_envelope) * 0.5  # Set to 50% of the maximum value
+            peaks, _ = find_peaks(self.amplitude_envelope, height=threshold)
 
         # media totale dei picchi
 
@@ -164,7 +182,7 @@ class Receiver:
                 break
 
             # cerca picco massimo
-        max_peak_index = np.argmax(amplitude_envelope)
+        max_peak_index = np.argmax(self.amplitude_envelope)
         if max_peak_index is None:
             print("No max index peaks found", file=sys.stderr)
             return
@@ -179,7 +197,7 @@ class Receiver:
         peak_density = np.zeros(4)
         for i in range(4):
             peaks_slot = peaks[np.where((peaks >= i * tf.chirp_samples) & (peaks < (i + 1) * tf.chirp_samples))]
-            mean_peaks[i] = mean(amplitude_envelope, peaks_slot)
+            mean_peaks[i] = mean(self.amplitude_envelope, peaks_slot)
             peak_density[i] = len(peaks_slot)
 
         max_peak = np.argmax(mean_peaks)
@@ -196,20 +214,72 @@ class Receiver:
         # plot correlation
         # disable plotting for BER/SNR simulation
 
+    def retrieve_signal(self, db_collection, data):  # retrieve audio data from database
+        for i in data:
+            # check if exist already in temp_files
+            if i in self.temp_files:
+                continue
+            query = {"_id": int(i)}
+            result = db_collection.find_one(query)
+
+            if result and 'audio_data' in result:
+                file_path = self.save_to_tempfile(result['_id'], result['audio_data'])
+                self.temp_files[i] = file_path
+
+    def save_to_tempfile(self, file_id, audio_data):
+        os.makedirs("/tmp/receiver_cache/audio", exist_ok=True)
+        file_path = f"/tmp/receiver_cache/audio/{file_id}.flac"
+        with open(file_path, 'wb') as f:
+            f.write(audio_data)
+        return file_path
+
+    def cleanup(self):
+        # Deletes all temporary files after processing.
+        for file_path in self.temp_files.values():
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        print("Deleted temporary files")
+
 
 if __name__ == "__main__":
     rc = Receiver()
     i = 0
     data = np.array([])
+    expected_data = []
     try:
-        while i < (tf.num_bits/2):
-            data = rc.read()
-            #print("Data length: ", len(data))
-            if data:
-                rc.decode_signal(data)
-                i += 1
-            else:
-                break
+        if tf.BIO_SIGNALS:
+            client = MongoClient(tf.uri, server_api=ServerApi('1'))
+            try:
+                client.admin.command('ping')
+                print("Pinged your deployment. You successfully connected to MongoDB!")
+            except Exception as e:
+                print(e)
+                exit(1)
+            database = client['dolphin_database']
+            collection = database['short_whistle_files']
+            collection_size = collection.count_documents({})
+            random.seed(tf.seed)
+            expected_data = [random.randint(1, collection_size) for _ in range(int(tf.num_bits / 2))]
+            rc.retrieve_signal(collection, expected_data)
+            print("Receiver: retrieved data")
+
+            while i < (tf.num_bits/2):
+                data = np.array(rc.read())
+                #print("Data length: ", len(data))
+                if data.size > 0:
+                    rc.decode_signal(data, expected_data[i])
+                    i += 1
+                else:
+                    break
+        else:
+            while i < (tf.num_bits/2):
+                data = np.array(rc.read())
+                #print("Data length: ", len(data))
+                if data.size > 0:
+                    rc.decode_signal(data)
+                    i += 1
+                else:
+                    break
     except Exception as e:
         print("Error: ", e, file=sys.stderr)
     finally:
@@ -222,6 +292,6 @@ if __name__ == "__main__":
         # print(rc.peak_density_decoded)
         np.save(res_directory + 'peak_density.npy', rc.peak_density_decoded)
         rc.channel.close()
-        if not tf.BER_SNR_SIMULATION:
-            print("Receiver OFF")
+        rc.cleanup()
+        print("Receiver OFF")
         exit(0)

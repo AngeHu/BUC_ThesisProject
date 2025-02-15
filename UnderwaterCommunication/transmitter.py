@@ -5,7 +5,12 @@ import channel
 import params as tf
 import time
 import sys
+import os
+import librosa
 from scipy.signal import chirp
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+import random
 
 if tf.DEBUG:
     import cProfile
@@ -25,9 +30,10 @@ if tf.DEBUG:
     atexit.register(save_profile)
 
 t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples_doppler) # vettore tempo
-chirp_signal = chirp(t_slot, f0=tf.f_min_scaled, f1=tf.f_max_scaled, t1=tf.t_slot, method='linear') # segnale chirp
+chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
 e_signal = sum(chirp_signal**2) / tf.chirp_samples_doppler # potenza segnale
 t_sampling = tf.T_SAMPLING
+
 
 # plot every 4*2 bits
 def plot_function(x, y_freq, y_sig):
@@ -50,15 +56,32 @@ def plot_function(x, y_freq, y_sig):
 
 def encode_signal(data):
     encoded_signal = []
-    for i in range(0, len(data), 2):
-        if data[i] == 0 and data[i+1] == 0:
-            encoded_signal.append(0)
-        elif data[i] == 0 and data[i+1] == 1:
-            encoded_signal.append(1)
-        elif data[i] == 1 and data[i+1] == 1:
-            encoded_signal.append(2)
-        elif data[i] == 1 and data[i+1] == 0:
-            encoded_signal.append(3)
+    if tf.BIO_SIGNALS:
+        binary = []
+        for i in data:
+            if i % 4 == 0:
+                encoded_signal.append(0)
+                binary += [0, 0]
+            elif i % 4 == 1:
+                encoded_signal.append(1)
+                binary += [0, 1]
+            elif i % 4 == 2:
+                encoded_signal.append(2)
+                binary += [1, 1]
+            elif i % 4 == 3:
+                encoded_signal.append(3)
+                binary += [1, 0]
+        return encoded_signal, binary
+    else:
+        for i in range(0, len(data), 2):
+            if data[i] == 0 and data[i+1] == 0:
+                encoded_signal.append(0)
+            elif data[i] == 0 and data[i+1] == 1:
+                encoded_signal.append(1)
+            elif data[i] == 1 and data[i+1] == 1:
+                encoded_signal.append(2)
+            elif data[i] == 1 and data[i+1] == 0:
+                encoded_signal.append(3)
     if tf.DEBUG: print("Encoded signal: ", encoded_signal)
     return encoded_signal
 
@@ -76,6 +99,8 @@ class Transmitter():
         self.previous_data = -1
         self.extra_zero = tf.sig_samples_doppler - tf.sig_samples
         self.last_frame = 0
+        if tf.BIO_SIGNALS:
+            self.temp_files = dict()
 
     # must visualize 2 graphs: one for frequency and one for signal
     def generate_frequency(self, data):
@@ -107,6 +132,32 @@ class Transmitter():
         self.previous_data = data
         return self.frequency, self.original_frequency
 
+    def retrieve_signal(self, db_collection, data):  # retrieve audio data from database
+        for i in data:
+            # check if exist already in temp_files
+            if i in self.temp_files:
+                continue
+            query = {"_id": int(i)}
+            result = db_collection.find_one(query)
+
+            if result and 'audio_data' in result:
+                file_path = self.save_to_tempfile(result['_id'], result['audio_data'])
+                self.temp_files[i] = file_path
+
+    def save_to_tempfile(self, file_id, audio_data):
+        os.makedirs("/tmp/transmitter_cache/audio", exist_ok=True)
+        file_path = f"/tmp/transmitter_cache/audio/{file_id}.flac"
+        with open(file_path, 'wb') as f:
+            f.write(audio_data)
+        return file_path
+
+    def cleanup(self):
+        # Deletes all temporary files after processing.
+        for file_path in self.temp_files.values():
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        print("Deleted temporary files")
+
     def generate_chirp(self, data):
         if tf.v_relative != 0:  # signal is affected by doppler effect
             if self.extra_zero > 0:  # signal is affected by doppler effect: compressed, so we need to add extra zeros
@@ -119,6 +170,18 @@ class Transmitter():
             self.signal = np.sin(2 * np.pi * self.frequency * (self.x - data * tf.t_slot))
         return self.signal
 
+    def generate_biosignal(self, data, audio_data, duration = 0.4): # data is slot number
+        file_path = self.temp_files[audio_data]
+        y, sr = librosa.load(file_path, sr=None)
+        self.signal = np.zeros(tf.sig_samples, dtype=np.float32)
+        self.frequency = np.zeros(tf.sig_samples, dtype=np.float32) # for animation purposes
+
+        start_idx = data * tf.chirp_samples
+        end_idx = start_idx + len(y)
+        self.signal[start_idx : end_idx] = y
+        e_signal = sum(self.signal**2) / tf.sig_samples
+        return e_signal
+
     def send_signal(self, noise):
         self.channel.send_signal(self.signal, noise)
 
@@ -128,26 +191,52 @@ class Transmitter():
 
 
 if __name__ == "__main__":
-    # generate bit sequence
-    data = np.random.randint(0, 2, tf.num_bits)
-    np.save(tf.res_directory + 'data.npy', data)
-    print(data)
+    transmitter = Transmitter()
+    if tf.BIO_SIGNALS:
+        # connect to database
+        client = MongoClient(tf.uri, server_api=ServerApi('1'))
+        try:
+            client.admin.command('ping')
+            print("Pinged your deployment. You successfully connected to MongoDB!")
+        except Exception as e:
+            print(e)
+            exit(1)
+
+        database = client['dolphin_database']
+        collection = database['short_whistle_files']
+        collection_size = collection.count_documents({})
+        random.seed(tf.seed)
+        data = [random.randint(1, collection_size) for _ in range(int(tf.num_bits / 2))]
+        transmitter.retrieve_signal(collection, data)
+        print("Transmitter: retrieved data")
+        encoded_data, binary = encode_signal(data)
+    else:
+        # generate bit sequence
+        data = np.random.randint(0, 2, tf.num_bits)
+        print(data)
+        np.save(tf.res_directory + 'data.npy', data)
+        encoded_data = encode_signal(data)
     SNR = float(sys.argv[1])
     # turn snr to linear scale
     SNR = 10 ** (SNR / 10)
 
-    transmitter = Transmitter()
     i = 0
-    data = encode_signal(data)
     noise = e_signal / SNR
 
-    while i < len(data):
-        transmitter.generate_signal(data[i])
-        transmitter.send_signal(noise) # send signal with noise
-        i += 1
+    if tf.BIO_SIGNALS:
+        while i < len(encoded_data):
+            e_signal = transmitter.generate_biosignal(encoded_data[i], data[i])
+            transmitter.send_signal(e_signal / SNR)
+            i += 1
+    else:
+        while i < len(data):
+            transmitter.generate_signal(data[i])
+            transmitter.send_signal(noise) # send signal with noise
+            i += 1
 
     time.sleep(1) # wait for receiver to finish
     transmitter.channel.close()
+    transmitter.cleanup()
 
     print("Transmitter OFF", file=sys.stderr)
 
