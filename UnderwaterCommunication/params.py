@@ -24,7 +24,7 @@ MEAN_PEAK = False
 SLOT_PEAK = True
 
 # ber/snr simulation parameters
-num_bits = 32 # Number of bits to transmit
+num_bits = 12 # Number of bits to transmit
 img_directory = "./img/slot_peak/"  # directory
 
 # MongoDB
@@ -32,7 +32,7 @@ seed = 42
 uri = f"mongodb+srv://{USERNAME}:{PASSWORD}@dolphincleanaudio.q2bsd.mongodb.net/?retryWrites=true&w=majority&appName=DolphinCleanAudio"
 
 
-SNR = -20  # rapporto segnale rumore
+SNR = 0  # rapporto segnale rumore
 
 # Doppler effect
 v_transmitter = 0 # positive if moving closer, negative if moving away

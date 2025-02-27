@@ -70,7 +70,6 @@ def plot_function(x, y_sig, y_freq=[]):
     ax2.set_ylabel('Signal')
     ax2.set_xlim(0, tf.T_frame_doppler)  # Replace with your time limit
     upper_lim = max(y_sig) + 0.1 * max(y_sig) if max(y_sig) < 1 else 1
-    print("upper limit: ", upper_lim)
     ax2.set_ylim(-upper_lim, upper_lim)
     ax2.grid(True)
 
@@ -79,7 +78,7 @@ def plot_function(x, y_sig, y_freq=[]):
         ax1.plot(x, y_freq, color='g', label='Frequency')
         ax1.set_ylabel('Frequency')
         ax1.set_xlim(0, tf.T_frame_doppler)
-        ax1.set_ylim(0, 500)
+        ax1.set_ylim(0, 50000)
         ax1.grid(True)
         ax1.set_xticklabels([])  # Remove redundant x-axis labels for top plot
 
@@ -89,17 +88,27 @@ def plot_function(x, y_sig, y_freq=[]):
 
 def encode_signal(data):
     encoded_signal = []
+    binary_data = []
     if tf.BIO_SIGNALS:
         for i in data:
             if i % 4 == 0:
                 encoded_signal.append(0)
+                binary_data.append(0)
+                binary_data.append(0)
             elif i % 4 == 1:
                 encoded_signal.append(1)
+                binary_data.append(0)
+                binary_data.append(1)
             elif i % 4 == 2:
                 encoded_signal.append(2)
+                binary_data.append(1)
+                binary_data.append(1)
             elif i % 4 == 3:
                 encoded_signal.append(3)
+                binary_data.append(1)
+                binary_data.append(0)
     else:
+        binary = data
         for i in range(0, len(data), 2):
             if data[i] == 0 and data[i+1] == 0:
                 encoded_signal.append(0)
@@ -110,7 +119,7 @@ def encode_signal(data):
             elif data[i] == 1 and data[i+1] == 0:
                 encoded_signal.append(3)
     if tf.DEBUG: print("Encoded signal: ", encoded_signal)
-    return encoded_signal
+    return encoded_signal, binary_data
 
 
 class Transmitter():
@@ -148,7 +157,7 @@ class Transmitter():
         start = data * tf.chirp_samples
         end = start + tf.chirp_samples_doppler
         self.frequency = np.full(tf.sig_samples_doppler, 0)
-        self.frequency[start:end] = np.linspace(tf.f_min, tf.f_max, tf.chirp_samples_doppler)
+        self.frequency[start:end] = np.linspace(tf.f_min_scaled, tf.f_max_scaled, tf.chirp_samples_doppler)
 
         # adjust frequency samples if signal is affected by doppler effect
         if self.extra_zero < 0: #signal is affected by doppler effect: compressed, so we need to add extra zeros
@@ -183,7 +192,7 @@ class Transmitter():
                 self.signal = np.sin(2 * np.pi * self.frequency * (self.x - data * tf.t_slot))
             self.original_signal = np.sin(2 * np.pi * self.original_frequency * (self.x - data * tf.t_slot))
         else:
-            self.signal = np.sin(2 * np.pi * self.frequency * (self.x - data * tf.t_slot))
+            self.signal = np.sin(2 * np.pi * self.frequency * (self.x - data*tf.t_slot))
         return self.signal
 
     def retrieve_signal(self, db_collection, data): # retrieve audio data from database
@@ -289,7 +298,8 @@ if __name__ == "__main__":
         SNR = 10 ** (tf.SNR / 10)
 
     i = 0
-    data_slot = encode_signal(data)
+    data_slot, binary = encode_signal(data)
+    print("Binary:", binary)
 
     # create animation file where to save values
     with open(animation_file, 'w') as file:
@@ -304,7 +314,7 @@ if __name__ == "__main__":
         animation = multiprocessing.Process(target=run_script, args=("./animation.py",))
         animation.start()
 
-    while i < len(data):
+    while i < len(data_slot):
         if tf.BIO_SIGNALS:
             e = transmitter.generate_biosignal(data_slot[i], data[i])
             transmitter.send_signal(e / SNR)

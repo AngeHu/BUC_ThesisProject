@@ -86,9 +86,10 @@ class Receiver:
         self.x = np.linspace(0, tf.T_FRAME, tf.sig_samples)
         self.correlation = []
         self.amplitude_envelope = []
-        self.mean_peak_decoded =np.array([], dtype=np.int8)  # data to decipher
-        self.max_peak_decoded = np.array([], dtype=np.int8)  # data to decipher
+        self.mean_peak_decoded =np.array([], dtype=np.int8)
+        self.max_peak_decoded = np.array([], dtype=np.int8)
         self.slot_peak_decoded = np.array([], dtype=np.int8)
+        self.peak_density = np.array([], dtype=np.int8)
         self.tm = tf.TimeFrame()
         self.temp_files = dict()
 
@@ -118,8 +119,8 @@ class Receiver:
     def plot_spectrogram(self, signal: np.array):
         print("Plotting spectrogram")
         print("Signal length: ", len(signal))
-        f, t, Sxx = spectrogram(signal, fs=tf.F_SAMPLING, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
-                                nfft=2048)
+        f, t, Sxx = spectrogram(signal, fs=tf.F_SAMPLING, window='hamming', nperseg=256, noverlap=256 * 0.25,
+                                nfft=256)
 
         plt.pcolormesh(t, f, 10 * np.log10(Sxx), shading='gouraud', cmap="viridis", vmin=-150, vmax=0)
         # plt.pcolormesh(t, f, Sxx_magnitude, shading='gouraud', cmap="viridis", vmin=-150, vmax=0)
@@ -143,6 +144,16 @@ class Receiver:
 
         filtered_data = lfilter(b, a, data)
         return filtered_data
+    
+    def highpass_filter(self, data, fs=tf.F_SAMPLING, highcut=tf.f_min, order=8):
+        b, a = butter(order, highcut, fs=fs, btype='high')
+        filtered_data = lfilter(b, a, data)
+        return filtered_data
+
+    def bandpass_filter(self, data, fs=tf.F_SAMPLING, lowcut=tf.f_min, highcut=tf.f_max, order=8):
+        b, a = butter(order, [lowcut, highcut], fs=fs, btype='band')
+        filtered_data = lfilter(b, a, data)
+        return filtered_data
 
     def decode_signal(self, signal : np.array, expected_signal=None):
         global chirp_signal
@@ -159,7 +170,7 @@ class Receiver:
             correlation_signal = chirp_signal
 
         if tf.f_max < tf.F_SAMPLING/2:
-            filtered_signal = self.lowpass_filter(signal)
+            filtered_signal = self.bandpass_filter(signal)
             self.correlation = correlate(filtered_signal, correlation_signal, mode='same')
         else:
             self.correlation = correlate(signal, correlation_signal, mode='same')
@@ -181,8 +192,8 @@ class Receiver:
 
         mean_peak = np.mean(t_frame[peaks])
         if mean_peak is None:
-            print("No mean peak", file=sys.stderr)
-            return
+            # append 00 if no peak found
+            self.mean_peak_decoded = np.append(self.mean_peak_decoded, [0, 0])
         # check in which interval the peak is
         for lapse in self.tm.timeInterval:
             if lapse.start * tf.t_slot <= mean_peak <= lapse.end * tf.t_slot:
@@ -190,24 +201,35 @@ class Receiver:
 
         # cerca picco massimo
         max_peak_index = np.argmax(self.amplitude_envelope)
+        # print("Max peak: ", max_peak_index/(tf.T_FRAME*tf.F_SAMPLING))
         if max_peak_index is None:
-            print("No max index peaks found", file=sys.stderr)
-            return
+            # append 00 if no peak found
+            self.max_peak_decoded = np.append(self.max_peak_decoded, [0, 0])
         for lapse in self.tm.timeInterval:
             if lapse.start * tf.chirp_samples <= max_peak_index <= lapse.end * tf.chirp_samples:
                 self.max_peak_decoded = np.append(self.max_peak_decoded, lapse.data)
 
         # media dei picchi per slot per trovare il picco più probabile
         mean_peaks = np.zeros(4)
+        peak_density = np.zeros(4)
         for i in range(4):
             peaks_slot = peaks[np.where((peaks >= i * tf.chirp_samples) & (peaks < (i + 1) * tf.chirp_samples))]
             mean_peaks[i] = mean(self.amplitude_envelope, peaks_slot)
+            peak_density[i] = len(peaks_slot)
+            # print(f"Mean peak [{i}]:  {mean_peaks[i]}")
+            # print(f"Peak density [{i}]:  {peak_density[i]}")
 
         max_peak = np.argmax(mean_peaks)
+        max_density = np.argmax(peak_density)
         if max_peak is None:
-            print("No peaks found", file=sys.stderr)
-            return
+            # append 00 if no peak found
+            self.slot_peak_decoded = np.append(self.slot_peak_decoded, [0, 0])
         self.slot_peak_decoded = np.append(self.slot_peak_decoded, self.tm.timeInterval[max_peak].data)
+
+        if max_density is None:
+            # append 00 if no peak found
+            self.peak_density = np.append(self.peak_density, [0, 0])
+        self.peak_density = np.append(self.peak_density, self.tm.timeInterval[max_density].data)
 
         # disable plotting for BER/SNR simulation
         if tf.BER_SNR_SIMULATION:
@@ -305,7 +327,7 @@ if __name__ == "__main__":
                 else:
                     rc.decode_signal(data)
                 rc.save_to_csv(animation_file, i, data)
-                if tf.PLOT: rc.plot_spectrogram(data)
+                #if tf.PLOT: rc.plot_spectrogram(rc.lowpass_filter(data))
                 i += 1
             else:
                 break

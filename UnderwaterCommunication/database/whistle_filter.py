@@ -11,7 +11,7 @@ import noisereduce as nr
 from dotenv import load_dotenv
 
 load_dotenv()
-TAGGING_CSV = os.getenv("TAGGING_CSV")
+TAGGING_CSV = os.getenv("TAGGING_PATH")
 SOURCE_PATH = os.getenv("SOURCE_PATH")
 DESTINATION_PATH = os.getenv("SHORT_WHISTLE_PATH")
 
@@ -96,7 +96,15 @@ def plot_spectrogram(flac_file, file_name, start_time, end_time, segment_type, c
 
     # Compute spectrogram for segment
     D = librosa.amplitude_to_db(np.abs(librosa.stft(segment)), ref=np.max)
-
+    D_original = librosa.amplitude_to_db(np.abs(librosa.stft(original_segment)), ref=np.max)
+    # Plot original spectrogram
+    plt.figure(figsize=(10, 6))
+    librosa.display.specshow(D_original, sr=sr, x_axis='time', y_axis='linear')
+    plt.colorbar(format='%+2.0f dB')
+    plt.title(f"Original Spectrogram {file_name} from {start_time}s to {end_time}s\nType: {segment_type} | Confidence: {confidence}")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Frequency (Hz)")
+    plt.show()
     # Plot spectrogram
     plt.figure(figsize=(10, 6))
     librosa.display.specshow(D, sr=sr, x_axis='time', y_axis='linear')
@@ -141,4 +149,6 @@ def process_csv(csv_file, audio_dir):
 if __name__ == "__main__":
     os.makedirs(destination_path, exist_ok=True)
     os.makedirs(destination_path+"/original", exist_ok=True)
+    print("tagging_csv: ", TAGGING_CSV)
+    print("source_path: ", SOURCE_PATH)
     process_csv(TAGGING_CSV, source_path)
