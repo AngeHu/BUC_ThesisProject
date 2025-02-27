@@ -210,6 +210,8 @@ if __name__ == "__main__":
         transmitter.retrieve_signal(collection, data)
         print("Transmitter: retrieved data")
         encoded_data, binary = encode_signal(data)
+        # print("Binary data: ", binary)
+        np.save(tf.res_directory + 'data.npy', binary)
     else:
         # generate bit sequence
         data = np.random.randint(0, 2, tf.num_bits)
