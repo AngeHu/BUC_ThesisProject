@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FFMpegWriter
 import params
 import os
 import traceback
@@ -21,6 +22,8 @@ doppler_last_position = 0  # Track the last read position in the CSV
 os.makedirs("animation", exist_ok=True)
 transmitter_file = "./animation/transmitter.csv"
 doppler_file = "./animation/transmitter_doppler.csv"
+SAVE_FILEPATH = "./animation/transmitter_animation.mp4"
+
 
 # Function to read new rows from the CSV
 def read_new_data(last_position, batch_size=BATCH_SIZE):
@@ -109,35 +112,35 @@ def read_doppler_data(last_position, batch_size=BATCH_SIZE):
 
     return last_position
 
-
-# Set up the figure and axes for animation
 if params.BIO_SIGNALS:
-    fig, (ax1, ax2) = plt.subplots(2, 1, num="Underwater Acoustic Communication Simulation", figsize=(8, 6))
+    fig, ax1 = plt.subplots(1, 1, num="Underwater Acoustic Communication Simulation", figsize=(8, 4))
 else:
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, num="Underwater Acoustic Communication Simulation", figsize=(8, 6))
+
 fig.suptitle("Transmitter", fontsize=16)
 fig.tight_layout()
-# Signal plot
+
+# Signal plot (always shown)
 ax1.set_title("Signal")
 ax1.grid(True)
-ax1.set_xlim(0, 10)  # Initial x-axis limit
+ax1.set_xlim(0, 10)
 ax1.set_ylim(-1, 1)
 line1, = ax1.plot([], [], lw=2, label="Signal", color='blue')
 ax1.set_xlabel("Time (s)")
 ax1.set_ylabel("Amplitude")
 ax1.legend()
 
-# Frequency plot
-ax2.set_title("Frequency")
-ax2.grid(True)
-ax2.set_xlim(0, 10)  # Match initial x-axis limit of ax1
-ax2.set_ylim(0, 50000)
-line2, = ax2.plot([], [], lw=2, label="Frequency", color='orange')
-ax2.set_xlabel("Time (s)")
-ax2.set_ylabel("Frequency (Hz)")
-ax2.legend()
 
 if not params.BIO_SIGNALS:
+    # Frequency plot
+    ax2.set_title("Frequency")
+    ax2.grid(True)
+    ax2.set_xlim(0, 10)  # Match initial x-axis limit of ax1
+    ax2.set_ylim(0, 50000)
+    line2, = ax2.plot([], [], lw=2, label="Frequency", color='orange')
+    ax2.set_xlabel("Time (s)")
+    ax2.set_ylabel("Frequency (Hz)")
+    ax2.legend()
     # Doppler plot
     title = str(params.v_relative) + " m/s relative velocity"
     ax3.set_title("Signal with Doppler Effect" + title)
@@ -161,55 +164,74 @@ if not params.BIO_SIGNALS:
 # Animation function
 def update(frame):
     global transmitter_last_position, doppler_last_position
-    # Fetch new data
     transmitter_position = read_new_data(transmitter_last_position)
+
     if not params.BIO_SIGNALS:
         doppler_position = read_doppler_data(doppler_last_position)
 
+    # Handle no-data scenario
     if params.BIO_SIGNALS:
         if transmitter_position == transmitter_last_position:
-            # No new data, skip update
-            return line1, line2
+            return (line1,)
     else:
         if doppler_position == doppler_last_position and transmitter_position == transmitter_last_position:
-            # No new data, skip update
-            return line1, line2, line3, line4
+            return (line1, line2, line3, line4)
         doppler_last_position = doppler_position
+
     transmitter_last_position = transmitter_position
 
     if time_data:
-        # Update the line data
         line1.set_data(time_data, signal_data)
-        line2.set_data(time_data, frequency_data)
-        # Adjust the x-axis to show the latest data window
         start_time = time_data[0]
         end_time = time_data[-1]
+
+        # Dynamic Y-axis scaling for bio signals
         if params.BIO_SIGNALS:
-            max_signal = max(signal_data, key=abs)
-            max_signal = max_signal + 0.1 * max_signal
-            if max_signal == 0:
-                max_signal = 1
-            ax1.set_ylim(-max_signal, max_signal)
+            max_signal = max(abs(s) for s in signal_data) or 1  # Handle zero case
+            ax1.set_ylim(-max_signal * 1.1, max_signal * 1.1)
+
         ax1.set_xlim(start_time, end_time)
-        ax2.set_xlim(start_time, end_time)
+
+        # Only update frequency if not bio signals
+        if not params.BIO_SIGNALS:
+            line2.set_data(time_data, frequency_data)
+            ax2.set_xlim(start_time, end_time)
 
     if not params.BIO_SIGNALS and doppler_time:
         line3.set_data(doppler_time, doppler_signal)
         line4.set_data(doppler_time, doppler_frequency)
-
         start_time = doppler_time[0]
         end_time = doppler_time[-1]
         ax3.set_xlim(start_time, end_time)
         ax4.set_xlim(start_time, end_time)
 
-    if params.BIO_SIGNALS:
-        return line1, line2
-    else:
-        return line1, line2, line3, line4
+    return (line1,) if params.BIO_SIGNALS else (line1, line2, line3, line4)
 
 
 if __name__ == "__main__":
     # Create the animation
-    ani = FuncAnimation(fig, update, interval=INTERVAL)  # Update every 500 ms
-    plt.tight_layout()
-    plt.show()
+    if __name__ == "__main__":
+        # Create the animation
+        ani = FuncAnimation(fig,
+                            update,
+                            interval=INTERVAL,
+                            save_count=1000)  # Add this for better buffer control
+
+        if params.SAVE_ANIMATION:
+            # Configure writer properly
+            writer = FFMpegWriter(
+                fps=30,
+                metadata={"title": "Transmitter Animation"},
+                bitrate=1800,
+                extra_args=['-crf', '23']  # Quality control
+            )
+
+            try:
+                ani.save(SAVE_FILEPATH, writer=writer)
+                print(f"Animation saved to {SAVE_FILEPATH}")
+            except Exception as e:
+                print(f"Failed to save animation: {str(e)}")
+                print("Verify FFmpeg is installed and in system PATH")
+
+        plt.tight_layout()
+        plt.show()

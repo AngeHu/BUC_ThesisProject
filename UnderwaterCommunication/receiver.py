@@ -3,8 +3,6 @@
 # receiver per ora riceve in tempo reale e deve salvare i dati in un array
 # receiver deve riuscire a ricostruire correttamente ilsegnale..più o meno
 # sicruamente ci sarà perdita di segnale!
-
-# receiver.py
 import time
 import numpy as np
 from matplotlib import pyplot as plt
@@ -15,7 +13,7 @@ from scipy.fft import fftshift
 from scipy.signal import butter, lfilter, find_peaks
 import sys
 import csv
-from pymongo import MongoClient
+from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import random
 import os
@@ -43,19 +41,17 @@ if tf.DEBUG:
 
     atexit.register(save_profile)
 
-
 SAVE_IMG = tf.SAVE_IMG
 img_directory = tf.img_directory
-METHOD = 1 if tf.MAX_PEAK else 2 if tf.MEAN_PEAK else 3 if tf.SLOT_PEAK else 0
+res_directory = tf.res_directory
+
 
 # increase agg.path.chunksize
 plt.rcParams['agg.path.chunksize'] = 10000
 
-# chirp signal
 t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples) # vettore tempo
-chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
-
 t_frame = np.linspace(0, tf.T_FRAME, tf.sig_samples) # vettore tempo
+chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
 
 def mean(x, indices):
     if indices.size == 0:
@@ -81,7 +77,7 @@ def plot_function(x, y_sig):
 
 class Receiver:
     def __init__(self):
-        self.channel = channel.Channel("rb")
+        self.channel = channel.Channel('rb')
         if not tf.BER_SNR_SIMULATION: print("Receiver ON")
         self.x = np.linspace(0, tf.T_FRAME, tf.sig_samples)
         self.correlation = []
@@ -89,7 +85,7 @@ class Receiver:
         self.mean_peak_decoded =np.array([], dtype=np.int8)
         self.max_peak_decoded = np.array([], dtype=np.int8)
         self.slot_peak_decoded = np.array([], dtype=np.int8)
-        self.peak_density = np.array([], dtype=np.int8)
+        self.peak_density_decoded = np.array([], dtype=np.int8)
         self.tm = tf.TimeFrame()
         self.temp_files = dict()
 
@@ -99,11 +95,11 @@ class Receiver:
         return data
 
     def plot_data(self, data):
-        print("Data length: ", len(data))
-        x = np.linspace(0, 4*tf.T_FRAME, len(data))
+        # print("Data length: ", len(data))
+        x = np.linspace(0, 4*tf.T_frame, len(data))
         plot_function(x, data)
 
-    def plot_correlation(self, signal: np.array): # non viene usata
+    def plot_correlation(self, signal: np.array):
         print("Plotting correlation")
         global chirp_signal
         self.correlation = correlate(signal, chirp_signal, mode='full')
@@ -184,6 +180,7 @@ class Receiver:
         threshold = mean_corr + 3 * corr_std # 3 sigma
         peaks, _ = find_peaks(self.amplitude_envelope, height=threshold)
 
+
         if peaks.size == 0:
             threshold = mean_corr + 0.5 * corr_std
             peaks, _ = find_peaks(self.amplitude_envelope, height=threshold)
@@ -199,9 +196,8 @@ class Receiver:
             if lapse.start * tf.t_slot <= mean_peak <= lapse.end * tf.t_slot:
                 self.mean_peak_decoded = np.append(self.mean_peak_decoded, lapse.data)
 
-        # cerca picco massimo
+            # cerca picco massimo
         max_peak_index = np.argmax(self.amplitude_envelope)
-        # print("Max peak: ", max_peak_index/(tf.T_FRAME*tf.F_SAMPLING))
         if max_peak_index is None:
             # append 00 if no peak found
             self.max_peak_decoded = np.append(self.max_peak_decoded, [0, 0])
@@ -216,8 +212,6 @@ class Receiver:
             peaks_slot = peaks[np.where((peaks >= i * tf.chirp_samples) & (peaks < (i + 1) * tf.chirp_samples))]
             mean_peaks[i] = mean(self.amplitude_envelope, peaks_slot)
             peak_density[i] = len(peaks_slot)
-            # print(f"Mean peak [{i}]:  {mean_peaks[i]}")
-            # print(f"Peak density [{i}]:  {peak_density[i]}")
 
         max_peak = np.argmax(mean_peaks)
         max_density = np.argmax(peak_density)
@@ -228,9 +222,10 @@ class Receiver:
 
         if max_density is None:
             # append 00 if no peak found
-            self.peak_density = np.append(self.peak_density, [0, 0])
-        self.peak_density = np.append(self.peak_density, self.tm.timeInterval[max_density].data)
+            self.peak_density_decoded = np.append(self.peak_density_decoded, [0, 0])
+        self.peak_density_decoded = np.append(self.peak_density_decoded, self.tm.timeInterval[max_density].data)
 
+        # plot correlation
         # disable plotting for BER/SNR simulation
         if tf.BER_SNR_SIMULATION:
             return
@@ -260,9 +255,9 @@ class Receiver:
             writer.writerows(rows)
             file.flush()
 
-    def retrieve_signal(self, db_collection, data): # retrieve audio data from database
+    def retrieve_signal(self, db_collection, data):  # retrieve audio data from database
         for i in data:
-            #check if exist already in temp_files
+            # check if exist already in temp_files
             if i in self.temp_files:
                 continue
             query = {"_id": int(i)}
@@ -284,15 +279,26 @@ class Receiver:
         for file_path in self.temp_files.values():
             if os.path.exists(file_path):
                 os.remove(file_path)
-                print(f"Deleted: {file_path}")
+        print("Deleted temporary files")
+
 
 if __name__ == "__main__":
     rc = Receiver()
     i = 0
     data = np.array([])
+    expected_data = []
+
+    with open(animation_file, 'w') as file:
+        writer = csv.DictWriter(file, fieldnames=["time", "signal", "correlation"])
+        writer.writeheader()
+
+    if tf.ANIMATION:
+        animation = multiprocessing.Process(target=run_script, args=("./receiver_animation.py",))
+        animation.start()
+
+        # connect to database
 
     if tf.BIO_SIGNALS:
-        # connect to database
         print(tf.uri)
         client = MongoClient(tf.uri, server_api=ServerApi('1'))
         try:
@@ -302,21 +308,12 @@ if __name__ == "__main__":
             print(e)
             exit(1)
         database = client['dolphin_database']
-        collection = database['short_whistle_files']
+        collection = database['short_whistle_files_normalized']
         collection_size = collection.count_documents({})
         random.seed(tf.seed)
         expected_data = [random.randint(1, collection_size) for _ in range(int(tf.num_bits / 2))]
         print("Expected data: ", expected_data)
         rc.retrieve_signal(collection, expected_data)
-
-
-    with open(animation_file, 'w') as file:
-        writer = csv.DictWriter(file, fieldnames=["time", "signal", "correlation"])
-        writer.writeheader()
-
-    if tf.ANIMATION:
-        animation = multiprocessing.Process(target=run_script, args=("./receiver_animation.py",))
-        animation.start()
 
     try:
         while i < int(tf.num_bits/2): # or while True: to receive indefinitely
@@ -335,8 +332,16 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Receiver interrupted", file=sys.stderr)
     except Exception as e:
-        print("Receiver Error:", e, file=sys.stderr)
+        print("Error: ", e, file=sys.stderr)
     finally:
+        # print(rc.mean_peak_decoded)
+        np.save(res_directory + 'mean_peak.npy', rc.mean_peak_decoded)
+        # print(rc.max_peak_decoded)
+        np.save(res_directory + 'max_peak.npy', rc.max_peak_decoded)
+        # print(rc.slot_peak_decoded)
+        np.save(res_directory + 'slot_peak.npy', rc.slot_peak_decoded)
+        # print(rc.peak_density_decoded)
+        np.save(res_directory + 'peak_density.npy', rc.peak_density_decoded)
         rc.channel.close()
         print(rc.slot_peak_decoded)
         print(rc.mean_peak_decoded)

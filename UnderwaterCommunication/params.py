@@ -15,7 +15,8 @@ if BER_SNR_SIMULATION: # se la simulazione di ber/snr è attiva, non posso fare 
 BIO_SIGNALS = True
 SAVE_IMG = False # salva le immagini
 PLOT = False # mostra i grafici
-ANIMATION = False # mostra l'animazione
+ANIMATION = True # mostra l'animazione
+SAVE_ANIMATION = True # salva l'animazione
 
 # chirp decoding - only one of the two can be active
 ### Not implemented yet
@@ -24,8 +25,9 @@ MEAN_PEAK = False
 SLOT_PEAK = True
 
 # ber/snr simulation parameters
-num_bits = 12 # Number of bits to transmit
+num_bits = 8 # Number of bits to transmit
 img_directory = "./img/slot_peak/"  # directory
+res_directory = "./res/"  # directory
 
 # MongoDB
 seed = 42

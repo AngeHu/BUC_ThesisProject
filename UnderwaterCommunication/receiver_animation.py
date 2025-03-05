@@ -2,6 +2,7 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FFMpegWriter
 import params
 import traceback
 matplotlib.use('TkAgg')
@@ -9,7 +10,7 @@ matplotlib.use('TkAgg')
 NUM_DISPAYED_FRAMES = 2  # Number of frames to display in animation window
 BATCH_SIZE = 800  # Number of new rows to read from the CSV
 FRAME_SIZE = NUM_DISPAYED_FRAMES*params.sig_samples  # Maximum number of data points to display
-INTERVAL = 1 # Milliseconds between updates
+INTERVAL = 0.1 # Milliseconds between updates
 # Global data arrays
 time_data, signal_data, correlation_data = [], [], []
 last_position = 0  # Track the last read position in the CSV
@@ -53,7 +54,7 @@ def read_new_data(last_position, batch_size=BATCH_SIZE):
             print(new_data)
 
         # Limit data length for smoother animation
-        if len(time_data) > FRAME_SIZE:
+        if len(time_data) > FRAME_SIZE and not params.SAVE_ANIMATION:
             time_data[:] = time_data[-FRAME_SIZE:]
             signal_data[:] = signal_data[-FRAME_SIZE:]
             correlation_data[:] = correlation_data[-FRAME_SIZE:]
@@ -119,7 +120,9 @@ def update(frame):
 
 
 if __name__ == "__main__":
-    # Create the animation
-    ani = FuncAnimation(fig, update, interval=INTERVAL)  # Update every 500 ms
+    ani = FuncAnimation(fig, update, interval=INTERVAL, blit=False)
+    if params.SAVE_ANIMATION:
+        writer = FFMpegWriter(fps=60, metadata={"title": "Receiver Animation"}, bitrate=1800)
+        ani.save("./animation/receiver_animation.mp4", writer=writer)
     plt.tight_layout()
     plt.show()

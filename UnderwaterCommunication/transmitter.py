@@ -230,7 +230,7 @@ class Transmitter():
         start_idx = data * tf.chirp_samples
         end_idx = start_idx + len(y)
         self.signal[start_idx : end_idx] = y
-        e_signal = sum(self.signal**2) / tf.sig_samples
+        e_signal = sum(self.signal**2) / len(y)
         return e_signal
 
     def save_to_csv(self, counter, filename = animation_file):
@@ -280,7 +280,7 @@ if __name__ == "__main__":
             exit(1)
 
         database = client['dolphin_database']
-        collection = database['short_whistle_files']
+        collection = database['short_whistle_files_normalized']
         collection_size = collection.count_documents({})
         random.seed(tf.seed)
         data = [random.randint(1, collection_size) for _ in range(int(tf.num_bits / 2))]
