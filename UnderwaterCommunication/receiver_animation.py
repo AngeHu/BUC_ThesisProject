@@ -10,12 +10,13 @@ matplotlib.use('TkAgg')
 NUM_DISPAYED_FRAMES = 2  # Number of frames to display in animation window
 BATCH_SIZE = 800  # Number of new rows to read from the CSV
 FRAME_SIZE = NUM_DISPAYED_FRAMES*params.sig_samples  # Maximum number of data points to display
-INTERVAL = 0.1 # Milliseconds between updates
+INTERVAL = 1 # Milliseconds between updates
 # Global data arrays
 time_data, signal_data, correlation_data = [], [], []
 last_position = 0  # Track the last read position in the CSV
 os.makedirs("animation", exist_ok=True)
 receiver_file = "./animation/receiver.csv"
+SAVE_FILEPATH = "./animation/receiver_animation.mp4"
 
 # Function to read new rows from the CSV
 def read_new_data(last_position, batch_size=BATCH_SIZE):
@@ -84,6 +85,7 @@ ax2.set_ylim(0, 50)
 line2, = ax2.plot([], [], lw=2, label="Correlation", color='blue')
 ax2.set_xlabel("Time (s)")
 ax2.set_ylabel("Correlation")
+fig.tight_layout()
 
 
 
@@ -120,9 +122,27 @@ def update(frame):
 
 
 if __name__ == "__main__":
-    ani = FuncAnimation(fig, update, interval=INTERVAL, blit=False)
+    # Create the animation
+    ani = FuncAnimation(fig,
+                        update,
+                        interval=INTERVAL,
+                        save_count=1000)  # Add this for better buffer control
+
     if params.SAVE_ANIMATION:
-        writer = FFMpegWriter(fps=60, metadata={"title": "Receiver Animation"}, bitrate=1800)
-        ani.save("./animation/receiver_animation.mp4", writer=writer)
+        # Configure writer properly
+        writer = FFMpegWriter(
+            fps=30,
+            metadata={"title": "Receiver Animation"},
+            bitrate=1800,
+            extra_args=['-crf', '23']  # Quality control
+        )
+
+        try:
+            ani.save(SAVE_FILEPATH, writer=writer)
+            print(f"Animation saved to {SAVE_FILEPATH}")
+        except Exception as e:
+            print(f"Failed to save animation: {str(e)}")
+            print("Verify FFmpeg is installed and in system PATH")
+
     plt.tight_layout()
     plt.show()

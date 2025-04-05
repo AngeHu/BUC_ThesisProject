@@ -3,6 +3,9 @@
 # receiver per ora riceve in tempo reale e deve salvare i dati in un array
 # receiver deve riuscire a ricostruire correttamente ilsegnale..più o meno
 # sicruamente ci sarà perdita di segnale!
+
+# Receiver script
+
 import time
 import numpy as np
 from matplotlib import pyplot as plt

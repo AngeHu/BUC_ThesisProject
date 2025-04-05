@@ -46,6 +46,7 @@ class Channel:
                   file=sys.stderr)  # se diviso per len(signal) da la metà
             print("Check SNR: ", sum(signal ** 2) / sum(noise[0:tf.sig_samples] ** 2), file=sys.stderr)
         '''
+        if tf.BIO_SIGNALS: noise = np.random.normal(0, 1, len(signal))
         signal = signal + noise
         return signal
 

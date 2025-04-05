@@ -311,7 +311,7 @@ if __name__ == "__main__":
         writer.writeheader()
 
     if tf.ANIMATION:
-        animation = multiprocessing.Process(target=run_script, args=("./animation.py",))
+        animation = multiprocessing.Process(target=run_script, args=("./transmitter_animation.py",))
         animation.start()
 
     while i < len(data_slot):

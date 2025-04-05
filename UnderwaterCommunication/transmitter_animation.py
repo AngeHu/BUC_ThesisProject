@@ -210,28 +210,26 @@ def update(frame):
 
 if __name__ == "__main__":
     # Create the animation
-    if __name__ == "__main__":
-        # Create the animation
-        ani = FuncAnimation(fig,
-                            update,
-                            interval=INTERVAL,
-                            save_count=1000)  # Add this for better buffer control
+    ani = FuncAnimation(fig,
+                        update,
+                        interval=INTERVAL,
+                        save_count=1000)  # Add this for better buffer control
 
-        if params.SAVE_ANIMATION:
-            # Configure writer properly
-            writer = FFMpegWriter(
-                fps=30,
-                metadata={"title": "Transmitter Animation"},
-                bitrate=1800,
-                extra_args=['-crf', '23']  # Quality control
-            )
+    if params.SAVE_ANIMATION:
+        # Configure writer properly
+        writer = FFMpegWriter(
+            fps=30,
+            metadata={"title": "Transmitter Animation"},
+            bitrate=1800,
+            extra_args=['-crf', '23']  # Quality control
+        )
 
-            try:
-                ani.save(SAVE_FILEPATH, writer=writer)
-                print(f"Animation saved to {SAVE_FILEPATH}")
-            except Exception as e:
-                print(f"Failed to save animation: {str(e)}")
-                print("Verify FFmpeg is installed and in system PATH")
+        try:
+            ani.save(SAVE_FILEPATH, writer=writer)
+            print(f"Animation saved to {SAVE_FILEPATH}")
+        except Exception as e:
+            print(f"Failed to save animation: {str(e)}")
+            print("Verify FFmpeg is installed and in system PATH")
 
-        plt.tight_layout()
-        plt.show()
+    plt.tight_layout()
+    plt.show()
