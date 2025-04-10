@@ -10,14 +10,22 @@ from scipy.signal import chirp
 import random
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
-import soundfile as sf
-import io
 import os
 import librosa
 import subprocess
 import multiprocessing
+def _print(*args, **kwargs):
+    print( "TRANSMITTER: ", *args, **kwargs)
 
-#TODO: animare il segnale trasmesso senza effetto doppler!
+
+os.makedirs("./animation", exist_ok=True)
+animation_file = "./animation/transmitter.csv"
+doppler_animation_file = "./animation/transmitter_doppler.csv"
+
+t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples_doppler) # vettore tempo
+chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
+e_signal = sum(chirp_signal**2) / tf.chirp_samples_doppler # potenza segnale
+t_sampling = tf.T_SAMPLING
 
 if tf.DEBUG:
     import cProfile
@@ -36,14 +44,6 @@ if tf.DEBUG:
 
     atexit.register(save_profile)
 
-# global variables
-os.makedirs("./animation", exist_ok=True)
-animation_file = "./animation/transmitter.csv"
-doppler_animation_file = "./animation/transmitter_doppler.csv"
-t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples_doppler) # vettore tempo
-chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
-e_signal = sum(chirp_signal**2) / tf.chirp_samples_doppler # potenza segnale
-t_sampling = tf.T_SAMPLING
 
 def arrange_step(start, num, step = t_sampling):
     # return np.arange(start, start + (num-1) * step, step)
@@ -56,7 +56,6 @@ def run_script(script_name):
 def plot_function(x, y_sig, y_freq=[]):
     # Check if frequency data is provided
     plot_freq = len(y_freq) > 0
-
     # Create subplots dynamically
     if plot_freq:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
@@ -118,7 +117,7 @@ def encode_signal(data):
                 encoded_signal.append(2)
             elif data[i] == 1 and data[i+1] == 0:
                 encoded_signal.append(3)
-    if tf.DEBUG: print("Encoded signal: ", encoded_signal)
+    if tf.DEBUG: _print("Encoded signal: ", encoded_signal)
     return encoded_signal, binary_data
 
 
@@ -126,7 +125,7 @@ class Transmitter():
 
     def __init__(self):
         self.channel = channel.Channel("wb")
-        if not tf.BER_SNR_SIMULATION: print("Transmitter ON")
+        if not tf.BER_SNR_SIMULATION: _print("Transmitter ON")
         self.x = np.linspace(0, tf.T_FRAME, tf.sig_samples)
         self.frequency = np.array([])
         self.signal = np.array([])
@@ -145,7 +144,7 @@ class Transmitter():
     def generate_signal(self, data):
         self.generate_frequency(data)
         self.generate_chirp(data)
-        print("Signal length: ", len(self.signal))
+        _print("Signal length: ", len(self.signal))
 
     def generate_frequency(self, data):
         # generate 2 frequencies if doppler effect is present
@@ -162,9 +161,9 @@ class Transmitter():
         # adjust frequency samples if signal is affected by doppler effect
         if self.extra_zero < 0: #signal is affected by doppler effect: compressed, so we need to add extra zeros
             #np.append(self.frequency, np.zeros(abs(self.extra_zero)))
-            print("extra zero: ", abs(self.extra_zero))
+            _print("extra zero: ", abs(self.extra_zero))
             self.frequency = np.pad(self.frequency, (0, abs(int(self.extra_zero))), 'constant', constant_values=0)
-            print("frequency samples: ", len(self.frequency))
+            _print("frequency samples: ", len(self.frequency))
 
         elif self.extra_zero > 0: #signal is affected by doppler effect: expanded, so we need to remove extra zeros
             if self.previous_data != 3 and data != 3: # no dati sporgenti
@@ -178,7 +177,7 @@ class Transmitter():
                     self.frequency = self.frequency[:-self.extra_zero]  # remove final the extra zeros
                     self.frequency = self.frequency[self.extra_zero:]
 
-        print(f"data: {data} - frequency samples: {len(self.frequency)} - max frequency: {self.frequency[-1]}")
+        _print(f"data: {data} - frequency samples: {len(self.frequency)} - max frequency: {self.frequency[-1]}")
         self.previous_data = data
         return self.frequency, self.original_frequency
 
@@ -219,7 +218,7 @@ class Transmitter():
         for file_path in self.temp_files.values():
             if os.path.exists(file_path):
                 os.remove(file_path)
-                print(f"Deleted: {file_path}")
+                _print(f"Deleted: {file_path}")
 
     def generate_biosignal(self, data, audio_data, duration = 0.4): # data is slot number
         file_path = self.temp_files[audio_data]
@@ -250,7 +249,7 @@ class Transmitter():
     def save_to_csv_doppler(self, filename = doppler_animation_file):
         # Calculate the time values for the current slot
         time_values = arrange_step(self.last_frame, len(self.signal))
-        print("time_values:", len(time_values))
+        _print("time_values:", len(time_values))
         self.last_frame = time_values[-1] + t_sampling
         # Prepare data rows in bulk
         rows = [[t, sig, freq] for t, sig, freq in zip(time_values, self.signal, self.frequency)]
@@ -274,9 +273,9 @@ if __name__ == "__main__":
         client = MongoClient(tf.uri, server_api=ServerApi('1'))
         try:
             client.admin.command('ping')
-            print("Pinged your deployment. You successfully connected to MongoDB!")
+            _print("Pinged your deployment. You successfully connected to MongoDB!")
         except Exception as e:
-            print(e)
+            _print(e)
             exit(1)
 
         database = client['dolphin_database']
@@ -287,7 +286,7 @@ if __name__ == "__main__":
         transmitter.retrieve_signal(collection, data)
     else:
         data = np.random.randint(0, 2, tf.num_bits)
-    print("Data:", data)
+    _print("Data:", data)
 
 
     if tf.BER_SNR_SIMULATION:
@@ -299,7 +298,7 @@ if __name__ == "__main__":
 
     i = 0
     data_slot, binary = encode_signal(data)
-    print("Binary:", binary)
+    _print("Binary:", binary)
 
     # create animation file where to save values
     with open(animation_file, 'w') as file:
@@ -333,7 +332,7 @@ if __name__ == "__main__":
     transmitter.channel.close()
 
     if not tf.BER_SNR_SIMULATION:
-        print("Transmitter OFF")
+        _print("OFF")
 
     if tf.BIO_SIGNALS:
         transmitter.cleanup()

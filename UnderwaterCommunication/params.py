@@ -12,11 +12,13 @@ if DEBUG: # se debug è attivo, non posso fare la simulazione di ber/snr
     BER_SNR_SIMULATION = False
 if BER_SNR_SIMULATION: # se la simulazione di ber/snr è attiva, non posso fare il debug
     DEBUG = False
-BIO_SIGNALS = True
+BIO_SIGNALS = False
 SAVE_IMG = False # salva le immagini
 PLOT = False # mostra i grafici
-ANIMATION = True # mostra l'animazione
+ANIMATION = False # mostra l'animazione
 SAVE_ANIMATION = True # salva l'animazione
+if not ANIMATION:
+    SAVE_ANIMATION = False
 
 # chirp decoding - only one of the two can be active
 ### Not implemented yet
@@ -77,6 +79,7 @@ class Period:
         self.end = end
         self.data = data
 
+# no reason to be here, only used by receiver
 class TimeFrame:
     def __init__(self):
         # intervallo di 2.5 sec

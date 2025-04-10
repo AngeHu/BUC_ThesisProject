@@ -47,7 +47,6 @@ def read_new_data(last_position, batch_size=BATCH_SIZE):
             # Print the exception details
             print(f"Exception Type: {type(e).__name__}")
             print(f"Exception Message: {e}")
-            # Print the entire stack trace
             print("Stack Trace:")
             traceback.print_exc()
             # Print the problematic data

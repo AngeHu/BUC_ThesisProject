@@ -2,7 +2,7 @@ import threading
 import subprocess
 import multiprocessing
 import time
-# Press the green button in the gutter to run the script.
+
 def run_script(script_name):
     subprocess.run(["python3", script_name])
 

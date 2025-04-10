@@ -1,10 +1,6 @@
-# receiver deve leggere da fifo in tempo reale...
-# aggiugerò in futuro il ritardo, che va calcolato in base a callibrazione
-# receiver per ora riceve in tempo reale e deve salvare i dati in un array
-# receiver deve riuscire a ricostruire correttamente ilsegnale..più o meno
-# sicruamente ci sarà perdita di segnale!
-
 # Receiver script
+# This script simulates a receiver that receives a signal from a transmitter, processes it, and decodes the information.
+# It includes functions for filtering, correlation, and plotting the results.
 
 import time
 import numpy as np
@@ -24,38 +20,53 @@ import librosa
 import subprocess
 import multiprocessing
 
+def _print(*args, **kwargs):
+    # Custom print function to print Receier before every message
+    print("RECEIVER: ", *args, **kwargs)
+
 os.makedirs("./animation", exist_ok=True)
 animation_file = "./animation/receiver.csv"
 
+SAVE_IMG = tf.SAVE_IMG
+# plots and results are saved in the following directories - to change the path, change the params.py file
+# image directory - contains plots of correlation
+os.makedirs(tf.img_directory, exist_ok=True)
+# result directory - contains results of decoding
+os.makedirs(tf.res_directory, exist_ok=True)
+
+# enable profiling if DEBUG is true
 if tf.DEBUG:
     import cProfile
     import atexit
     import pstats
 
-    # Set up profiling to save to a file
+    # set up profiling to save to a file
     profiler = cProfile.Profile()
     profiler.enable()
 
-    # Save profile results to a file on exit
+    # save profile results to a file on exit
     def save_profile():
-        with open('receiver_profile.prof', 'w') as f:  # Use 'receiver_profile.prof' for receiver.py
+        with open('receiver_profile.prof', 'w') as f:
             ps = pstats.Stats(profiler, stream=f)
             ps.strip_dirs().sort_stats('cumulative').print_stats()
 
     atexit.register(save_profile)
 
-SAVE_IMG = tf.SAVE_IMG
-img_directory = tf.img_directory
-res_directory = tf.res_directory
-
-
-# increase agg.path.chunksize
+# increase agg.path.chunksize for faster plotting
 plt.rcParams['agg.path.chunksize'] = 10000
 
-t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples) # vettore tempo
-t_frame = np.linspace(0, tf.T_FRAME, tf.sig_samples) # vettore tempo
-chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # segnale chirp
+t_slot = np.linspace(0, tf.t_slot, tf.chirp_samples) # slot time vector
+t_frame = np.linspace(0, tf.T_FRAME, tf.sig_samples) # frame time vector
+chirp_signal = chirp(t_slot, f0=tf.f_min, f1=tf.f_max, t1=tf.t_slot, method='linear') # reference chirp signal
 
+# time intervals
+slot1 = {"start": 0, "end": 1, "data": [0, 0]}
+slot2 = {"start": 1, "end": 2, "data": [0, 1]}
+slot3 = {"start": 2, "end": 3, "data": [1, 1]}
+slot4 = {"start": 3, "end": 4, "data": [1, 0]}
+intervals = [slot1, slot2, slot3, slot4]
+
+# wrap the mean function to handle empty indices
 def mean(x, indices):
     if indices.size == 0:
         return 0
@@ -64,15 +75,16 @@ def mean(x, indices):
 def run_script(script_name):
     subprocess.run(["python3", script_name])
 
-def plot_function(x, y_sig):
-    if(len(x) != len(y_sig)):
-        print("Errore: dimensioni di x e y non coincidono")
+# plot function - used to plot the signal and correlation
+def plot_function(x, y):
+    if(len(x) != len(y)):
+        _print("Error: x and y must have the same length")
         return
     figure, ax = plt.subplots()
-    sig, = ax.plot(x, y_sig, color='r', label='Segnale')  # Crea il grafico
+    sig, = ax.plot(x, y, color='r', label='Segnale')  # Crea il grafico
 
     ax.set_xlabel('Time(s)')  # Aggiunge un'etichetta all'asse x
-    ax.set_ylabel('Ampiezza')  # Aggiunge un'etichetta all'asse y1
+    ax.set_ylabel('Amplitude')  # Aggiunge un'etichetta all'asse y1
     ax.set_xlim(0, 4*tf.T_FRAME)
     ax.set_ylim(-5, 5)
     plt.grid(True)  # Aggiunge una griglia al grafico (opzionale)
@@ -81,16 +93,22 @@ def plot_function(x, y_sig):
 class Receiver:
     def __init__(self):
         self.channel = channel.Channel('rb')
-        if not tf.BER_SNR_SIMULATION: print("Receiver ON")
+        if not tf.BER_SNR_SIMULATION: _print("ON")
         self.x = np.linspace(0, tf.T_FRAME, tf.sig_samples)
         self.correlation = []
         self.amplitude_envelope = []
+        # results array - one per decoding algorithm
         self.mean_peak_decoded =np.array([], dtype=np.int8)
         self.max_peak_decoded = np.array([], dtype=np.int8)
         self.slot_peak_decoded = np.array([], dtype=np.int8)
         self.peak_density_decoded = np.array([], dtype=np.int8)
-        self.tm = tf.TimeFrame()
+        self.default_value = [0, 0]
         self.temp_files = dict()
+
+    def __delete__(self):
+        if os.path.exists(self.channel.channel):
+            os.remove(self.channel.channel)
+            _print(f"Channel named {self.channel.channel} is deleted successfully", file=sys.stderr)
 
 
     def read(self):
@@ -98,12 +116,12 @@ class Receiver:
         return data
 
     def plot_data(self, data):
-        # print("Data length: ", len(data))
+        # _print("Data length: ", len(data))
         x = np.linspace(0, 4*tf.T_frame, len(data))
         plot_function(x, data)
 
     def plot_correlation(self, signal: np.array):
-        print("Plotting correlation")
+        _print("Plotting correlation")
         global chirp_signal
         self.correlation = correlate(signal, chirp_signal, mode='full')
         lags = np.arange(-len(signal) + 1, len(chirp_signal)) / (tf.sig_samples)
@@ -116,8 +134,8 @@ class Receiver:
         plt.show()
 
     def plot_spectrogram(self, signal: np.array):
-        print("Plotting spectrogram")
-        print("Signal length: ", len(signal))
+        _print("Plotting spectrogram")
+        _print("Signal length: ", len(signal))
         f, t, Sxx = spectrogram(signal, fs=tf.F_SAMPLING, window='hamming', nperseg=256, noverlap=256 * 0.25,
                                 nfft=256)
 
@@ -130,12 +148,13 @@ class Receiver:
         plt.tight_layout()  # Adjust layout to make room for the labels
         plt.show()
 
+    # compute power of the signal to plot the spectrogram
     def compute_power(self, signal: np.array):
-        print("Computing power")
+        _print("Computing power")
         f, t, Sxx = spectrogram(signal, fs=tf.F_SAMPLING, window='hamming', nperseg=2048, noverlap=2048 * 0.25,
                                 nfft=2048)
         power = np.sum(Sxx, axis=0)
-        print("Power: ", power)
+        _print("Power: ", power)
 
     # decode signal
     def lowpass_filter(self, data, fs=tf.F_SAMPLING, lowcut=tf.f_max, order=8):
@@ -154,11 +173,48 @@ class Receiver:
         filtered_data = lfilter(b, a, data)
         return filtered_data
 
+    # --------------- DECODING METHODS -----------------------------
+    def max_peak(self):
+        # Calculate the maximum peak
+        max_peak_index = np.argmax(self.amplitude_envelope)
+        for slot in intervals:
+            if slot['start'] * tf.chirp_samples <= max_peak_index <= slot['end'] * tf.chirp_samples:
+                return slot['data']
+        return self.default_value
+
+    def mean_peak_position(self, peaks):
+        # calculate average position of the peaks
+        mean_position = mean(t_frame, peaks)
+        for slot in intervals:
+            if slot['start'] * tf.t_slot <= mean_position <= slot['end'] * tf.t_slot:
+                return slot['data']
+        return self.default_value
+
+    def mean_peak_height(self, peaks):
+        # calculate the average height of the peaks in each slot
+        mean_peaks = np.zeros(4)
+        for i in range(4):
+            peaks_slot = peaks[np.where((peaks >= i * tf.chirp_samples) & (peaks < (i + 1) * tf.chirp_samples))]
+            mean_peaks[i] = mean(self.amplitude_envelope, peaks_slot)
+        slot = np.argmax(mean_peaks)
+        return intervals[slot]['data'] if slot is not None else self.default_value
+
+    def peak_density(self, peaks):
+        # Calculate the density of peaks in each slot
+        peak_density = np.zeros(4)
+        for i in range(4):
+            peaks_slot = peaks[np.where((peaks >= i * tf.chirp_samples) & (peaks < (i + 1) * tf.chirp_samples))]
+            peak_density[i] = len(peaks_slot)
+        slot = np.argmax(peak_density)
+        return intervals[slot]['data'] if slot is not None else self.default_value
+    
+    # -------------------------------------------------------------
+
     def decode_signal(self, signal : np.array, expected_signal=None):
         global chirp_signal
 
         if signal.size == 0:
-            print("Empty signal", file=sys.stderr)
+            _print("Empty signal", file=sys.stderr)
             return None
 
         # filter and correlate signal
@@ -189,7 +245,7 @@ class Receiver:
             peaks, _ = find_peaks(self.amplitude_envelope, height=threshold)
 
         # media totale dei picchi
-
+        '''
         mean_peak = np.mean(t_frame[peaks])
         if mean_peak is None:
             # append 00 if no peak found
@@ -199,7 +255,7 @@ class Receiver:
             if lapse.start * tf.t_slot <= mean_peak <= lapse.end * tf.t_slot:
                 self.mean_peak_decoded = np.append(self.mean_peak_decoded, lapse.data)
 
-            # cerca picco massimo
+        # cerca picco massimo
         max_peak_index = np.argmax(self.amplitude_envelope)
         if max_peak_index is None:
             # append 00 if no peak found
@@ -227,6 +283,13 @@ class Receiver:
             # append 00 if no peak found
             self.peak_density_decoded = np.append(self.peak_density_decoded, [0, 0])
         self.peak_density_decoded = np.append(self.peak_density_decoded, self.tm.timeInterval[max_density].data)
+        '''
+
+        # decode signal using different methods
+        self.mean_peak_decoded = np.append(self.mean_peak_decoded, self.mean_peak_position(peaks))
+        self.max_peak_decoded = np.append(self.max_peak_decoded, self.max_peak())
+        self.slot_peak_decoded = np.append(self.slot_peak_decoded, self.mean_peak_height(peaks))
+        self.peak_density_decoded = np.append(self.peak_density_decoded, self.peak_density(peaks))
 
         # plot correlation
         # disable plotting for BER/SNR simulation
@@ -243,7 +306,7 @@ class Receiver:
             if SAVE_IMG:
                 timestamp = time.time()
                 timestamp = str(timestamp).replace(".", "")
-                plt.savefig(img_directory + timestamp + ".png")
+                plt.savefig(tf.img_directory + timestamp + ".png")
             else:
                 plt.show()
 
@@ -282,7 +345,7 @@ class Receiver:
         for file_path in self.temp_files.values():
             if os.path.exists(file_path):
                 os.remove(file_path)
-        print("Deleted temporary files")
+        _print("Deleted temporary files")
 
 
 if __name__ == "__main__":
@@ -302,20 +365,19 @@ if __name__ == "__main__":
         # connect to database
 
     if tf.BIO_SIGNALS:
-        print(tf.uri)
         client = MongoClient(tf.uri, server_api=ServerApi('1'))
         try:
             client.admin.command('ping')
-            print("Pinged your deployment. You successfully connected to MongoDB!")
+            _print("Pinged your deployment. You successfully connected to MongoDB!")
         except Exception as e:
-            print(e)
+            _print(e)
             exit(1)
         database = client['dolphin_database']
         collection = database['short_whistle_files_normalized']
         collection_size = collection.count_documents({})
         random.seed(tf.seed)
         expected_data = [random.randint(1, collection_size) for _ in range(int(tf.num_bits / 2))]
-        print("Expected data: ", expected_data)
+        _print("Expected data: ", expected_data)
         rc.retrieve_signal(collection, expected_data)
 
     try:
@@ -333,24 +395,21 @@ if __name__ == "__main__":
                 break
     # print error on stderr
     except KeyboardInterrupt:
-        print("Receiver interrupted", file=sys.stderr)
+        _print("Receiver interrupted", file=sys.stderr)
     except Exception as e:
-        print("Error: ", e, file=sys.stderr)
+        _print("Error: ", e, file=sys.stderr)
     finally:
-        # print(rc.mean_peak_decoded)
-        np.save(res_directory + 'mean_peak.npy', rc.mean_peak_decoded)
-        # print(rc.max_peak_decoded)
-        np.save(res_directory + 'max_peak.npy', rc.max_peak_decoded)
-        # print(rc.slot_peak_decoded)
-        np.save(res_directory + 'slot_peak.npy', rc.slot_peak_decoded)
-        # print(rc.peak_density_decoded)
-        np.save(res_directory + 'peak_density.npy', rc.peak_density_decoded)
+        np.save(tf.res_directory + 'mean_peak.npy', rc.mean_peak_decoded)
+        np.save(tf.res_directory + 'max_peak.npy', rc.max_peak_decoded)
+        np.save(tf.res_directory + 'slot_peak.npy', rc.slot_peak_decoded)
+        np.save(tf.res_directory + 'peak_density.npy', rc.peak_density_decoded)
         rc.channel.close()
-        print(rc.slot_peak_decoded)
-        print(rc.mean_peak_decoded)
-        print(rc.max_peak_decoded)
+        _print("Mean peak height: ", rc.slot_peak_decoded)
+        _print("Mean peak position: ", rc.mean_peak_decoded)
+        _print("Max peak: ", rc.max_peak_decoded)
+        _print("Peak density: ", rc.peak_density_decoded)
         if not tf.BER_SNR_SIMULATION:
-            print("Receiver OFF")
+            _print("OFF")
         if tf.BIO_SIGNALS:
             rc.cleanup()
         if tf.ANIMATION: animation.join()
